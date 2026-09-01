@@ -106,7 +106,10 @@ class EmojiSync(commands.Cog):
         if env_code_emojis is not None:
             sync_code_emojis = env_code_emojis.lower() in {"1", "true", "yes", "on"}
 
-        startup_auto_sync = bool(emoji_config.get("STARTUP_AUTO_SYNC", False))
+        # Render deployments normally do not have a local .env file; make the
+        # bundled emoji pack sync by default so stale source emoji IDs are
+        # replaced with this application's own emoji IDs on first startup.
+        startup_auto_sync = bool(emoji_config.get("STARTUP_AUTO_SYNC", True))
         if env_startup_sync is not None:
             startup_auto_sync = env_startup_sync.lower() in {"1", "true", "yes", "on"}
 
