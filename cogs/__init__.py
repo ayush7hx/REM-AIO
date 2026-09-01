@@ -73,6 +73,7 @@ from .events.auto import Autorole
 from .events.greet2 import greet
 from .events.mention import Mention
 from .events.react import React
+from .events.owner_protection import OwnerProtection
 from .events.autoreact import AutoReactListener
 ########-------HELP-------########
 from .rem.antinuke import _antinuke
@@ -164,7 +165,7 @@ COGS_TO_LOAD = [
     _ignore, _server, _voice, _welcome, _giveaway, _ticket, Loggingdrop,
     _vanity, _inviteTracker,
     AutoBlacklist, Guild, Errors, Autorole2, Autorole, greet, AutoResponder,
-    Mention, AutoRole, React, AutoReaction, AutoReactListener, NotifCommands,
+    Mention, AutoRole, React, OwnerProtection, AutoReaction, AutoReactListener, NotifCommands,
     AntiMemberUpdate, AntiBan, AntiBotAdd, AntiChannelCreate, AntiChannelDelete,
     AntiChannelUpdate, AntiEveryone, AntiGuildUpdate, AntiIntegration, AntiKick,
     AntiPrune, AntiRoleCreate, AntiRoleDelete, AntiRoleUpdate, AntiWebhookUpdate,

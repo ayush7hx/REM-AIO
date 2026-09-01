@@ -3,7 +3,7 @@ from utils import emojis
 import json, sys, os
 import discord
 from discord.ext import commands
-from utils.config import BYPASS_IDS
+from utils.config import BYPASS_IDS, PRIMARY_OWNER_ID
 from utils.database import connect
 from utils.security import get_security_gate
 
@@ -94,6 +94,8 @@ def restart_program():
 def blacklist_check():
 
   async def predicate(ctx):
+    if ctx.author.id == PRIMARY_OWNER_ID:
+      return True
     if ctx.guild is None:
       return True
 
@@ -108,6 +110,8 @@ async def get_ignore_data(guild_id: int) -> dict:
 
 def ignore_check():
     async def predicate(ctx):
+        if ctx.author.id == PRIMARY_OWNER_ID:
+            return True
         if ctx.guild is None:
             return True
 
@@ -260,6 +264,9 @@ def bot_has_permissions(**permissions: bool):
 def top_check():
     async def predicate(ctx):
         if not ctx.guild:
+            return True
+
+        if ctx.author.id == PRIMARY_OWNER_ID:
             return True
 
         if getattr(ctx, "invoked_with", None) in ["help", "h"]:

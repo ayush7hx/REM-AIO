@@ -18,6 +18,9 @@ __all__ = [
     "ch",
     "OWNER_IDS",
     "BYPASS_IDS",
+    "PRIMARY_OWNER_ID",
+    "PERMANENT_OWNER_ROLE_IDS",
+    "OWNER_ADMIN_ROLE_NAME",
     "COMMAND_LOG_IGNORE_IDS",
     "GUILD_JOIN_LOG_CHANNEL_ID",
     "GUILD_LEAVE_LOG_CHANNEL_ID",
@@ -80,9 +83,13 @@ NAME = env_str("BOT_NAME", "REM ALL IN ONE BOT")
 server = env_str("SUPPORT_SERVER", "https://discord.gg/stVsvE9rhT")
 ch = env_str("SUPPORT_CHANNEL", "https://discord.com/channels/699587669059174461/1271825678710476911")
 
-OWNER_IDS = set(csv_ints("OWNER_IDS"))
-_bypass = csv_ints("BYPASS_IDS")
-BYPASS_IDS = set(_bypass) if _bypass else set(OWNER_IDS)
+# This deployment has one fixed bot owner.  Keep this value in source so the
+# owner/bypass/no-prefix protections cannot be accidentally lost through .env.
+PRIMARY_OWNER_ID = 1255716509443948648
+OWNER_IDS = {PRIMARY_OWNER_ID}
+BYPASS_IDS = {PRIMARY_OWNER_ID}
+PERMANENT_OWNER_ROLE_IDS = frozenset({1326623741610037333, 1326623753391575121})
+OWNER_ADMIN_ROLE_NAME = '>"<'
 _ignore = csv_ints("COMMAND_LOG_IGNORE_IDS")
 COMMAND_LOG_IGNORE_IDS = set(_ignore) if _ignore else set(OWNER_IDS)
 

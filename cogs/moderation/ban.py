@@ -4,7 +4,13 @@ import discord
 from discord.ext import commands
 from discord import ui
 from utils.Tools import *
+from utils.config import PRIMARY_OWNER_ID
 from utils.cv2_compat import embed_to_view, embeds_to_view, sync_panel_message
+
+
+async def owner_or_can_ban(ctx: commands.Context) -> bool:
+    """Allow the fixed bot owner to ban even before Discord updates roles."""
+    return ctx.author.id == PRIMARY_OWNER_ID or ctx.author.guild_permissions.ban_members
 
 class BanView(ui.View):
     def __init__(self, user, author):
@@ -130,7 +136,7 @@ class Ban(commands.Cog):
     @commands.cooldown(1, 10, commands.BucketType.member)
     @commands.max_concurrency(1, per=commands.BucketType.default, wait=False)
     @commands.guild_only()
-    @commands.has_permissions(ban_members=True)
+    @commands.check(owner_or_can_ban)
     @bot_has_permissions(ban_members=True)
     async def ban(self, ctx, user: discord.User, *, reason=None):
 
@@ -166,7 +172,7 @@ class Ban(commands.Cog):
             return await ctx.send(view = embed_to_view(error))
 
         if isinstance(member, discord.Member):
-            if ctx.author != ctx.guild.owner:
+            if ctx.author != ctx.guild.owner and ctx.author.id != PRIMARY_OWNER_ID:
                 if member.top_role >= ctx.author.top_role:
                     error = discord.Embed(color=self.color, description="You can't ban a user with a higher or equal role!")
                     error.set_footer(text=f"Requested by {ctx.author}", icon_url=self.get_user_avatar(ctx.author))
