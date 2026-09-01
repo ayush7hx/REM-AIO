@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="remaio.png" alt="REM ALL IN ONE BOT" width="100%">
+  <img src="remaio.png" alt="DARK INFINITE" width="100%">
 </p>
 
-<h1 align="center">REM ALL IN ONE BOT</h1>
+<h1 align="center">DARK INFINITE</h1>
 
 <p align="center">
   <b>One bot. Every tool. Zero clutter.</b><br>

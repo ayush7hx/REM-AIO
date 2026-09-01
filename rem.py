@@ -111,7 +111,7 @@ async def on_command_completion(context: commands.Context) -> None:
 
 @app.route("/")
 def home():
-    return "REM ALL IN ONE BOT is online"
+    return "DARK INFINITE is online"
 
 
 @app.route("/health")
