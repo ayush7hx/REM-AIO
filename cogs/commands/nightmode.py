@@ -4,6 +4,7 @@ import asyncio
 import discord
 from discord.ext import commands
 from utils.Tools import *
+from utils.config import PRIMARY_OWNER_ID
 from utils.config import BYPASS_IDS
 from utils.cv2_compat import embed_to_view, embeds_to_view
 from utils.database import get_anti_db
@@ -72,7 +73,7 @@ class Nightmode(commands.Cog):
                 description='Your Server Doesn\'t Meet My 50 Member Criteria'
             )))
 
-        own = ctx.author.id == ctx.guild.owner_id
+        own = ctx.author.id in {ctx.guild.owner_id, PRIMARY_OWNER_ID}
         check = await self.is_extra_owner(ctx.author, ctx.guild)
         if not own and not check and ctx.author.id not in self.ricky:
             return await ctx.send(view = embed_to_view(discord.Embed(title=f"{emojis.CROSSICON} Access Denied",
@@ -145,7 +146,7 @@ class Nightmode(commands.Cog):
                 description='Your Server Doesn\'t Meet My 50 Member Criteria'
             )))
 
-        own = ctx.author.id == ctx.guild.owner_id
+        own = ctx.author.id in {ctx.guild.owner_id, PRIMARY_OWNER_ID}
         check = await self.is_extra_owner(ctx.author, ctx.guild)
         if not own and not check and ctx.author.id not in self.ricky:
             return await ctx.send(view = embed_to_view(discord.Embed(title=f"{emojis.ICONS_WARNING} Access Denied",

@@ -43,7 +43,7 @@ class Embed(commands.Cog):
                 try:
                     tit = await ctx.bot.wait_for("message", timeout=30, check=chk)
                     embed.title = tit.content
-                    await msg.edit(content=msgx, view = embed_to_view(embed))
+                    await msg.edit(view=embed_to_view(embed, view=view))
                 except asyncio.TimeoutError:
                     await ctx.send("Timed Out")
             elif value == "Description":
@@ -51,7 +51,7 @@ class Embed(commands.Cog):
                 try:
                     desc = await ctx.bot.wait_for("message", timeout=30, check=chk)
                     embed.description = desc.content
-                    await msg.edit(content=msgx, view = embed_to_view(embed))
+                    await msg.edit(view=embed_to_view(embed, view=view))
                 except asyncio.TimeoutError:
                     await ctx.send("Timed Out")
             elif value == "Color":
@@ -60,7 +60,7 @@ class Embed(commands.Cog):
                     col = await ctx.bot.wait_for("message", timeout=30, check=chk)
                     color = discord.Colour(int(col.content.strip("#"), 16))  # hex se int
                     embed.color = color
-                    await msg.edit(content=msgx, view = embed_to_view(embed))
+                    await msg.edit(view=embed_to_view(embed, view=view))
                 except ValueError:
                     await ctx.send("Invalid color format. Please retry with a valid hexadecimal color value.")
                 except asyncio.TimeoutError:
@@ -72,7 +72,7 @@ class Embed(commands.Cog):
                     if not thumb.content.startswith("http"):
                         raise ValueError("Invalid URL format")
                     embed.set_thumbnail(url=thumb.content)
-                    await msg.edit(content=msgx, view = embed_to_view(embed))
+                    await msg.edit(view=embed_to_view(embed, view=view))
                 except ValueError as e:
                     await ctx.send(str(e))
                 except asyncio.TimeoutError:
@@ -84,7 +84,7 @@ class Embed(commands.Cog):
                     if not img.content.startswith("http"):
                         raise ValueError("Invalid URL format")
                     embed.set_image(url=img.content)
-                    await msg.edit(content=msgx, view = embed_to_view(embed))
+                    await msg.edit(view=embed_to_view(embed, view=view))
                 except ValueError as e:
                     await ctx.send(str(e))
                 except asyncio.TimeoutError:
@@ -94,7 +94,7 @@ class Embed(commands.Cog):
                 try:
                     foot = await ctx.bot.wait_for("message", timeout=30, check=chk)
                     embed.set_footer(text=foot.content)
-                    await msg.edit(content=msgx, view = embed_to_view(embed))
+                    await msg.edit(view=embed_to_view(embed, view=view))
                 except asyncio.TimeoutError:
                     await ctx.send("Timed Out")
             elif value == "Footer Icon":
@@ -104,7 +104,7 @@ class Embed(commands.Cog):
                     if not foot_icon.content.startswith("http"):
                         raise ValueError("Invalid URL format")
                     embed.set_footer(text=embed.footer.text or "Footer", icon_url=foot_icon.content)
-                    await msg.edit(content=msgx, view = embed_to_view(embed))
+                    await msg.edit(view=embed_to_view(embed, view=view))
                 except ValueError as e:
                     await ctx.send(str(e))
                 except asyncio.TimeoutError:
@@ -114,7 +114,7 @@ class Embed(commands.Cog):
                 try:
                     auth_text = await ctx.bot.wait_for("message", timeout=30, check=chk)
                     embed.set_author(name=auth_text.content)
-                    await msg.edit(content=msgx, view = embed_to_view(embed))
+                    await msg.edit(view=embed_to_view(embed, view=view))
                 except asyncio.TimeoutError:
                     await ctx.send("Timed Out")
             elif value == "Author Icon":
@@ -124,7 +124,7 @@ class Embed(commands.Cog):
                     if not auth_icon.content.startswith("http"):
                         raise ValueError("Invalid URL format")
                     embed.set_author(name=embed.author.name or "Author", icon_url=auth_icon.content)
-                    await msg.edit(content=msgx, view = embed_to_view(embed))
+                    await msg.edit(view=embed_to_view(embed, view=view))
                 except ValueError as e:
                     await ctx.send(str(e))
                 except asyncio.TimeoutError:
@@ -136,7 +136,7 @@ class Embed(commands.Cog):
                     await ctx.send("**Enter Field value:**")
                     value = await ctx.bot.wait_for("message", timeout=30, check=chk)
                     embed.add_field(name=name.content, value=value.content, inline=False)
-                    await msg.edit(content=msgx, view = embed_to_view(embed))
+                    await msg.edit(view=embed_to_view(embed, view=view))
                 except asyncio.TimeoutError:
                     await ctx.send("Timed Out")
 
@@ -194,8 +194,7 @@ class Embed(commands.Cog):
         view.add_item(button_send)
         view.add_item(button_delete)
 
-        msg = await ctx.send(view = embed_to_view(embed, view = view), content=msgx, )
-        ctx.message = msg
+        msg = await ctx.send(view=embed_to_view(embed, view=view))
 
 
 

@@ -6,7 +6,7 @@ import discord
 from discord.ext import commands
 from discord.ui import View, Button
 from utils.Tools import *
-from utils.config import BYPASS_IDS
+from utils.config import BYPASS_IDS, PRIMARY_OWNER_ID
 from utils.cv2_compat import embed_to_view, embeds_to_view
 
 class Extraowner(commands.Cog):
@@ -29,7 +29,7 @@ class Extraowner(commands.Cog):
     async def extraowner(self, ctx, option: str = None, user: discord.Member = None):
         guild_id = ctx.guild.id
 
-        if ctx.guild.member_count < 30:
+        if ctx.guild.member_count < 30 and ctx.author.id != PRIMARY_OWNER_ID:
             embed = discord.Embed(
                 description="❌ | Your Server Doesn't Meet My 30 Member Criteria",
                 color=0x000000

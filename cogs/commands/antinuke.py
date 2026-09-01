@@ -6,6 +6,7 @@ from discord.ext import commands
 import asyncio
 from utils.Tools import *
 from utils.cv2_compat import embed_to_view, embeds_to_view
+from utils.config import PRIMARY_OWNER_ID
 
 
 class Antinuke(commands.Cog):
@@ -61,7 +62,7 @@ class Antinuke(commands.Cog):
         ) as cursor:
             check = await cursor.fetchone()
 
-    is_owner = ctx.author.id == ctx.guild.owner_id
+    is_owner = ctx.author.id in {ctx.guild.owner_id, PRIMARY_OWNER_ID}
     if not is_owner and not check:
       embed = discord.Embed(title=f"{emojis.CROSSICON} Access Denied",
                 color=0x000000,

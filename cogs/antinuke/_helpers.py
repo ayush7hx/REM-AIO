@@ -8,6 +8,7 @@ import discord
 import pytz
 
 from utils.database import connect
+from utils.config import PRIMARY_OWNER_ID
 
 log = logging.getLogger(__name__)
 
@@ -98,7 +99,7 @@ async def fetch_recent_audit_entry(
 
 
 def is_trusted_actor(guild: discord.Guild, actor_id: int, bot_user_id: int) -> bool:
-    return actor_id in {guild.owner_id, bot_user_id}
+    return actor_id in {guild.owner_id, bot_user_id, PRIMARY_OWNER_ID}
 
 
 async def is_guild_blacklisted(guild_id: int) -> bool:

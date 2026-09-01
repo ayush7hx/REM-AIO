@@ -6,6 +6,7 @@ import asyncio
 import discord
 from discord.ext import commands
 from utils.Tools import *
+from utils.config import PRIMARY_OWNER_ID
 
 
 class Unwhitelist(commands.Cog):
@@ -26,7 +27,7 @@ class Unwhitelist(commands.Cog):
     @commands.max_concurrency(1, per=commands.BucketType.default, wait=False)
     @commands.guild_only()
     async def unwhitelist(self, ctx, member: discord.Member = None):
-        if ctx.guild.member_count < 30:
+        if ctx.guild.member_count < 30 and ctx.author.id != PRIMARY_OWNER_ID:
             return await ctx.send(view=error_panel(f"{emojis.CROSSICON} | Your Server Doesn't Meet My 30 Member Criteria"))
 
         async with self.db.execute(
@@ -41,7 +42,7 @@ class Unwhitelist(commands.Cog):
         ) as cursor:
             antinuke = await cursor.fetchone()
 
-        is_owner = ctx.author.id == ctx.guild.owner_id
+        is_owner = ctx.author.id in {ctx.guild.owner_id, PRIMARY_OWNER_ID}
         if not is_owner and not check:
             return await ctx.send(view=error_panel(
                 "Only Server Owner or Extra Owner can Run this Command!",
