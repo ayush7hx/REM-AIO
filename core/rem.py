@@ -233,7 +233,7 @@ class Rem(commands.AutoShardedBot):
     async def on_connect(self):
         await self.change_presence(
             status=discord.Status.dnd,
-            activity=discord.Activity(type=discord.ActivityType.playing, name=">help | >invite"),
+            activity=discord.Activity(type=discord.ActivityType.playing, name="DARK INFINITE ERA"),
         )
 
     async def send_raw(
