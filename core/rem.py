@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import typing
+from types import MethodType
 from typing import List
 
 import aiohttp
@@ -11,7 +12,7 @@ from discord.ext import commands
 
 from utils import console, getConfig, updateConfig
 from utils.components_v2 import error_panel, warning_panel
-from utils.config import OWNER_IDS, PREFIX
+from utils.config import OWNER_IDS, PREFIX, PRIMARY_OWNER_ID
 from utils.database import close_shared_databases, connect, get_anti_db
 from utils.security import AccessDecision, get_security_gate
 from utils.discord_compat import install_neutral_embed_policy
@@ -58,6 +59,33 @@ class Rem(commands.AutoShardedBot):
         self.add_check(self._global_security_check)
         self.tree.interaction_check = self._interaction_security_check
         await self.load_extensions()
+
+    async def is_owner(self, user: discord.abc.User) -> bool:
+        """Treat the configured primary owner as the bot owner everywhere."""
+        return user.id == PRIMARY_OWNER_ID or await super().is_owner(user)
+
+    def _install_owner_command_bypass(self) -> None:
+        """Let the primary owner pass every prefix-command check.
+
+        Commands in this project use many independent permission/check
+        decorators.  Centralising the bypass here ensures the owner can use
+        every command before Discord roles have been applied as well.
+        """
+        for command in self.walk_commands():
+            if getattr(command, "_owner_bypass_installed", False):
+                continue
+
+            original_can_run = command.can_run
+
+            async def can_run_with_owner_bypass(
+                _command: commands.Command, ctx: Context, *, _original=original_can_run
+            ) -> bool:
+                if ctx.author.id == PRIMARY_OWNER_ID:
+                    return _command.enabled
+                return await _original(ctx)
+
+            command.can_run = MethodType(can_run_with_owner_bypass, command)
+            command._owner_bypass_installed = True
 
     async def _deny_access(self, ctx: Context, decision: AccessDecision) -> None:
         if self._shutting_down or self.is_closed():
@@ -152,6 +180,7 @@ class Rem(commands.AutoShardedBot):
         for extension in extensions:
             try:
                 await self.load_extension(extension)
+                self._install_owner_command_bypass()
                 console.success(f"Loaded {extension}")
                 log.info("Loaded extension: %s", extension)
             except Exception as e:
