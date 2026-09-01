@@ -1,4 +1,5 @@
 from utils import emojis
+from utils.config import PRIMARY_OWNER_ID
 
 import discord
 import asyncio
@@ -126,7 +127,7 @@ class Moderation(commands.Cog):
   @bot_has_permissions(manage_roles=True)
   @commands.cooldown(1, 15, commands.BucketType.channel)
   async def unlockall(self, ctx):
-      if ctx.author == ctx.guild.owner or ctx.author.top_role.position > ctx.guild.me.top_role.position:
+      if ctx.author.id == PRIMARY_OWNER_ID or ctx.author == ctx.guild.owner or ctx.author.top_role.position > ctx.guild.me.top_role.position:
           button = Button(label="Confirm",
                     style=discord.ButtonStyle.green,
                     emoji=f"{emojis.TICK}")
@@ -207,7 +208,7 @@ class Moderation(commands.Cog):
   @bot_has_permissions(manage_roles=True)
   @commands.cooldown(1, 15, commands.BucketType.channel)
   async def lockall(self, ctx):
-      if ctx.author == ctx.guild.owner or ctx.author.top_role.position > ctx.guild.me.top_role.position:
+      if ctx.author.id == PRIMARY_OWNER_ID or ctx.author == ctx.guild.owner or ctx.author.top_role.position > ctx.guild.me.top_role.position:
           button = Button(label="Confirm",
                     style=discord.ButtonStyle.green,
                     emoji=f"{emojis.TICK}")
@@ -355,7 +356,7 @@ class Moderation(commands.Cog):
   @bot_has_permissions(manage_roles=True)
   @commands.cooldown(1, 15, commands.BucketType.channel)
   async def hideall(self, ctx):
-      if ctx.author == ctx.guild.owner or ctx.author.top_role.position > ctx.guild.me.top_role.position:
+      if ctx.author.id == PRIMARY_OWNER_ID or ctx.author == ctx.guild.owner or ctx.author.top_role.position > ctx.guild.me.top_role.position:
           button = Button(label="Confirm",
                     style=discord.ButtonStyle.green,
                     emoji=f"{emojis.TICK}")
@@ -429,7 +430,7 @@ class Moderation(commands.Cog):
   @bot_has_permissions(manage_roles=True)
   @commands.cooldown(1, 15, commands.BucketType.channel)
   async def unhideall(self, ctx):
-      if ctx.author == ctx.guild.owner or ctx.author.top_role.position > ctx.guild.me.top_role.position:
+      if ctx.author.id == PRIMARY_OWNER_ID or ctx.author == ctx.guild.owner or ctx.author.top_role.position > ctx.guild.me.top_role.position:
           button = Button(label="Confirm",
                     style=discord.ButtonStyle.green,
                     emoji=f"{emojis.TICK}")
@@ -522,7 +523,7 @@ class Moderation(commands.Cog):
           return
           
       data = await getConfig(ctx.guild.id)
-      if ctx.author == ctx.guild.owner or ctx.author.top_role.position > ctx.guild.me.top_role.position:
+      if ctx.author.id == PRIMARY_OWNER_ID or ctx.author == ctx.guild.owner or ctx.author.top_role.position > ctx.guild.me.top_role.position:
           data["prefix"] = str(prefix)
           await updateConfig(ctx.guild.id, data)
           embed1=discord.Embed(title=f"{emojis.TICK} Success",

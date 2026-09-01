@@ -1,5 +1,6 @@
 from utils.database import connect
 from utils import emojis
+from utils.config import PRIMARY_OWNER_ID
 
 import asyncio
 import discord
@@ -164,7 +165,7 @@ class Automod(commands.Cog):
     @bot_has_permissions(manage_guild=True)
     async def enable(self, ctx):
         guild_id = ctx.guild.id
-        if ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
+        if ctx.author.id != PRIMARY_OWNER_ID and ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
             embed = discord.Embed(title=f"{emojis.CROSSICON} Access Denied", description="Your top role must be at the **same** position or **higher** than my top role.", color=0x000000)
             embed.set_footer(text=f"“{ctx.command.qualified_name}” Command executed by {ctx.author}",
                        icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
@@ -398,7 +399,7 @@ class Automod(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def punishment(self, ctx):
         guild_id = ctx.guild.id
-        if ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
+        if ctx.author.id != PRIMARY_OWNER_ID and ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
             embed = discord.Embed(title=f"{emojis.CROSSICON} Access Denied", description="Your top role must be at the **same** position or **higher** than my top role.", color=0x000000)
             embed.set_footer(text=f"“{ctx.command.qualified_name}” Command executed by {ctx.author}",
                        icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
@@ -493,7 +494,7 @@ class Automod(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def ignore_channel(self, ctx, channel: discord.TextChannel):
         guild_id = ctx.guild.id
-        if ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
+        if ctx.author.id != PRIMARY_OWNER_ID and ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
             embed = discord.Embed(title=f"{emojis.CROSSICON} Access Denied", description="Your top role must be at the **same** position or **higher** than my top role.", color=0x000000)
             embed.set_thumbnail(url=self.bot.user.display_avatar.url)
             embed.set_footer(text=f"“{ctx.command.qualified_name}” Command executed by {ctx.author}",
@@ -562,7 +563,7 @@ class Automod(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def ignore_role(self, ctx, role: discord.Role):
         guild_id = ctx.guild.id
-        if ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
+        if ctx.author.id != PRIMARY_OWNER_ID and ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
             embed = discord.Embed(title=f"{emojis.CROSSICON} Access Denied", description="Your top role must be at the **same** position or **higher** than my top role.", color=0x000000)
             embed.set_footer(text=f"“{ctx.command.qualified_name}” Command executed by {ctx.author}",
                        icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
@@ -631,7 +632,7 @@ class Automod(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def ignore_show(self, ctx):
         guild_id = ctx.guild.id
-        if ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
+        if ctx.author.id != PRIMARY_OWNER_ID and ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
             embed = discord.Embed(title=f"{emojis.CROSSICON} Access Denied", description="Your top role must be at the **same** position or **higher** than my top role.", color=0x000000)
             embed.set_footer(text=f"“{ctx.command.qualified_name}” Command executed by {ctx.author}",
                        icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
@@ -696,7 +697,7 @@ class Automod(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def ignore_reset(self, ctx):
         guild_id = ctx.guild.id
-        if ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
+        if ctx.author.id != PRIMARY_OWNER_ID and ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
             embed = discord.Embed(title=f"{emojis.CROSSICON} Access Denied", description="Your top role must be at the **same** position or **higher** than my top role.", color=0x000000)
             embed.set_footer(text=f"“{ctx.command.qualified_name}” Command executed by {ctx.author}",
                        icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
@@ -742,7 +743,7 @@ class Automod(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def unignore_channel(self, ctx, channel: discord.TextChannel):
         guild_id = ctx.guild.id
-        if ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
+        if ctx.author.id != PRIMARY_OWNER_ID and ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
             embed = discord.Embed(title=f"{emojis.CROSSICON} Access Denied", description="Your top role must be at the **same** position or **higher** than my top role.", color=0x000000)
             embed.set_footer(text=f"“{ctx.command.qualified_name}” Command executed by {ctx.author}",
                        icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
@@ -797,7 +798,7 @@ class Automod(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def unignore_role(self, ctx, role: discord.Role):
         guild_id = ctx.guild.id
-        if ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
+        if ctx.author.id != PRIMARY_OWNER_ID and ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
             embed = discord.Embed(title=f"{emojis.CROSSICON} Access Denied", description="Your top role must be at the **same** position or **higher** than my top role.", color=0x000000)
             embed.set_footer(text=f"“{ctx.command.qualified_name}” Command executed by {ctx.author}",
                        icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
@@ -853,7 +854,7 @@ class Automod(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def disable(self, ctx):
         guild_id = ctx.guild.id
-        if ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
+        if ctx.author.id != PRIMARY_OWNER_ID and ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
             embed = discord.Embed(title=f"{emojis.CROSSICON} Access Denied", description="Your top role must be at the **same** position or **higher** than my top role.", color=0x000000)
             embed.set_footer(text=f"“{ctx.command.qualified_name}” Command executed by {ctx.author}",
                        icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
@@ -938,7 +939,7 @@ class Automod(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def config(self, ctx):
         guild_id = ctx.guild.id
-        if ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
+        if ctx.author.id != PRIMARY_OWNER_ID and ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
             embed = discord.Embed(title=f"{emojis.CROSSICON}Access Denied", description="Your top role must be at the **same** position or **higher** than my top role.", color=0x000000)
             embed.set_footer(text=f"“{ctx.command.qualified_name}” Command executed by {ctx.author}",
                        icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
@@ -993,7 +994,7 @@ class Automod(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def logging(self, ctx, channel: discord.TextChannel):
         guild_id = ctx.guild.id
-        if ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
+        if ctx.author.id != PRIMARY_OWNER_ID and ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
             embed = discord.Embed(title=f"{emojis.CROSSICON} Access Denied", description="Your top role must be at the **same** position or **higher** than my top role.", color=0x000000)
             embed.set_footer(text=f"“{ctx.command.qualified_name}” Command executed by {ctx.author}",
                        icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
