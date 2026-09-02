@@ -7,7 +7,6 @@ import logging
 #----------Commands---------#
 from .commands.help import Help
 from .commands.general import General
-from .commands.music import Music
 from .commands.automod import Automod
 from .commands.welcome import Welcomer
 from .commands.fun import Fun
@@ -81,7 +80,6 @@ from .rem.extra import _extra
 from .rem.general import _general
 from .rem.automod import _automod 
 from .rem.moderation import _moderation
-from .rem.music import _music
 from .rem.fun import _fun
 from .rem.games import _games
 from .rem.ignore import _ignore
@@ -131,6 +129,7 @@ from .automod.antilink import AntiLink
 from .automod.anti_invites import AntiInvite
 from .automod.anti_mass_mention import AntiMassMention
 from .automod.anti_emoji_spam import AntiEmojiSpam
+from .automod.protected_users import ProtectedUsers
 
 
 from .moderation.ban import Ban
@@ -154,14 +153,14 @@ log = logging.getLogger(__name__)
 
 
 COGS_TO_LOAD = [
-    Help, General, Music, Automod, Welcomer, Fun, Games, Extra, Voice, Owner,
+    Help, General, Automod, Welcomer, Fun, Games, Extra, Voice, Owner,
     Customrole, afk, Embed, Media, Ignore, Invcrole, Giveaway, Steal, EmojiSync,
     Ship, Timer, Blacklist, Block, Nightmode, Badges, AiStuffCog, InviteTracker,
     Antinuke, Whitelist,
     Unwhitelist, Extraowner, Slots, Blackjack, Stats, Emergency, Status,
     NoPrefix, FilterCog, Global, Map, ImageCommands, TicketSystem, Logging, QR, VanityRoles,
     ReactionRoles, Messages, Messagespack, TranslateCog, FastGreet, Jail,
-    _antinuke, _extra, _general, _automod, _moderation, _music, _fun, _games,
+    _antinuke, _extra, _general, _automod, _moderation, _fun, _games,
     _ignore, _server, _voice, _welcome, _giveaway, _ticket, Loggingdrop,
     _vanity, _inviteTracker,
     AutoBlacklist, Guild, Errors, Autorole2, Autorole, greet, AutoResponder,
@@ -170,7 +169,7 @@ COGS_TO_LOAD = [
     AntiChannelUpdate, AntiEveryone, AntiGuildUpdate, AntiIntegration, AntiKick,
     AntiPrune, AntiRoleCreate, AntiRoleDelete, AntiRoleUpdate, AntiWebhookUpdate,
     AntiWebhookCreate, AntiWebhookDelete, AntiSpam, AntiCaps, AntiInvite,
-    AntiLink, AntiMassMention, AntiEmojiSpam, Ban, Unban, Mute, Unmute, Lock,
+    AntiLink, AntiMassMention, AntiEmojiSpam, ProtectedUsers, Ban, Unban, Mute, Unmute, Lock,
     Unlock, Hide, Unhide, Kick, Warn, Role, Message, Moderation, TopCheck, Snipe,
 ]
 

@@ -24,6 +24,8 @@ __all__ = [
     "COMMAND_LOG_IGNORE_IDS",
     "GUILD_JOIN_LOG_CHANNEL_ID",
     "GUILD_LEAVE_LOG_CHANNEL_ID",
+    "PROTECTED_USER_IDS",
+    "PROTECTED_LOG_CHANNEL_ID",
     "SPOTIFY_CLIENT_ID",
     "SPOTIFY_CLIENT_SECRET",
     "GIPHY_TOKEN",
@@ -95,6 +97,12 @@ COMMAND_LOG_IGNORE_IDS = set(_ignore) if _ignore else set(OWNER_IDS)
 
 GUILD_JOIN_LOG_CHANNEL_ID = _csv_int_or_none("GUILD_JOIN_LOG_CHANNEL_ID")
 GUILD_LEAVE_LOG_CHANNEL_ID = _csv_int_or_none("GUILD_LEAVE_LOG_CHANNEL_ID")
+
+# Messages posted by these users are removed immediately.  This is intended
+# for temporarily protecting a server from accounts that are known to be at
+# risk of compromise.  Keep these values in .env, never in source code.
+PROTECTED_USER_IDS = frozenset(csv_ints("PROTECTED_USER_IDS"))
+PROTECTED_LOG_CHANNEL_ID = _csv_int_or_none("PROTECTED_LOG_CHANNEL_ID")
 
 SPOTIFY_CLIENT_ID = env_str("SPOTIFY_CLIENT_ID")
 SPOTIFY_CLIENT_SECRET = env_str("SPOTIFY_CLIENT_SECRET")
