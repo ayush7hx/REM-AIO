@@ -1,4 +1,4 @@
-"""Immediately remove messages from configured, high-risk Discord accounts."""
+"""Remove everyone/here mentions from configured, high-risk Discord accounts."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ log = logging.getLogger(__name__)
 
 
 class ProtectedUsers(commands.Cog):
-    """Delete every guild message created by a configured user ID.
+    """Delete guild messages with an everyone/here mention from configured users.
 
     This deliberately does not timeout, kick, or ban the member: those actions
     obey Discord's role hierarchy.  Deleting a message only requires the bot
@@ -30,6 +30,7 @@ class ProtectedUsers(commands.Cog):
             message.guild is None
             or message.author.bot
             or message.author.id not in PROTECTED_USER_IDS
+            or not message.mention_everyone
         ):
             return
 
