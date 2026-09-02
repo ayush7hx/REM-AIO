@@ -152,6 +152,8 @@ class PanelLayoutView(discord.ui.LayoutView):
             if interactive:
                 children.append(discord.ui.Separator())
                 for index in range(0, len(interactive), 5):
+                    for item in interactive[index : index + 5]:
+                        item._view = None
                     children.append(discord.ui.ActionRow(*interactive[index : index + 5]))
 
         self.add_item(discord.ui.Container(*children))

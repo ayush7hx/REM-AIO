@@ -168,6 +168,9 @@ class Embed(commands.Cog):
             await ctx.send("Please mention the **channel** where you want to send this embed:")
             try:
                 tit = await ctx.bot.wait_for("message", timeout=30, check=chk)
+                if not tit.channel_mentions:
+                    await ctx.send("Please mention a valid channel and try again.")
+                    return
                 chnl = tit.channel_mentions[0]
                 await chnl.send(view = embed_to_view(embed))
                 await ctx.send(view = embed_to_view(discord.Embed(title=f"{emojis.TICK} Success",
