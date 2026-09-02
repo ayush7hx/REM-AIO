@@ -18,6 +18,16 @@ class Errors(Cog):
   async def on_command_error(self, ctx: Context, error):
     if ctx.command is None:
       return
+
+    async def send_command_error():
+      embed = discord.Embed(
+        title="Command Error",
+        description="Something went wrong while running that command. The error was logged.",
+        color=0x000000,
+      )
+      embed.set_author(name="DARK INFINITE", icon_url=self.client.user.display_avatar.url)
+      embed.set_footer(text=f"Requested by {ctx.author}", icon_url=ctx.author.display_avatar.url)
+      await ctx.reply(view=embed_to_view(embed), delete_after=10, mention_author=False)
     
 
     if isinstance(error, commands.CommandNotFound):
@@ -134,14 +144,14 @@ class Errors(Cog):
     if isinstance(error, commands.CommandInvokeError):
       log.exception("Command %s failed", ctx.command.qualified_name if ctx.command else "unknown", exc_info=error.original)
       try:
-        await ctx.reply("Something went wrong while running that command. The error was logged.", delete_after=10, mention_author=False)
+        await send_command_error()
       except discord.HTTPException:
         pass
       return
 
     log.exception("Unhandled command error in %s", ctx.command.qualified_name if ctx.command else "unknown", exc_info=error)
     try:
-      await ctx.reply("Something went wrong while running that command. The error was logged.", delete_after=10, mention_author=False)
+      await send_command_error()
     except discord.HTTPException:
       pass
 
@@ -162,6 +172,15 @@ class Errors(Cog):
       message = "Something went wrong while running that command. The error was logged."
 
     try:
+      if message == "Something went wrong while running that command. The error was logged.":
+        embed = discord.Embed(title="Command Error", description=message, color=0x000000)
+        embed.set_author(name="DARK INFINITE", icon_url=self.client.user.display_avatar.url)
+        embed.set_footer(text=f"Requested by {interaction.user}", icon_url=interaction.user.display_avatar.url)
+        if interaction.response.is_done():
+          await interaction.followup.send(view=embed_to_view(embed), ephemeral=True)
+        else:
+          await interaction.response.send_message(view=embed_to_view(embed), ephemeral=True)
+        return
       if interaction.response.is_done():
         await interaction.followup.send(message, ephemeral=True)
       else:
