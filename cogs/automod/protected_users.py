@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import io
 import logging
+from pathlib import PurePosixPath
 
 import discord
 from discord.ext import commands
@@ -14,7 +16,7 @@ log = logging.getLogger(__name__)
 
 
 class ProtectedUsers(commands.Cog):
-    """Delete guild messages with an everyone/here mention from configured users.
+    """Delete mentions or image messages from configured users.
 
     This deliberately does not timeout, kick, or ban the member: those actions
     obey Discord's role hierarchy.  Deleting a message only requires the bot
@@ -24,15 +26,26 @@ class ProtectedUsers(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
+    @staticmethod
+    def _has_image_attachment(message: discord.Message) -> bool:
+        return any(
+            (attachment.content_type or "").startswith("image/")
+            or PurePosixPath(attachment.filename).suffix.lower()
+            in {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".avif"}
+            for attachment in message.attachments
+        )
+
     @commands.Cog.listener("on_message")
     async def remove_protected_user_message(self, message: discord.Message) -> None:
         if (
             message.guild is None
             or message.author.bot
             or message.author.id not in PROTECTED_USER_IDS
-            or not message.mention_everyone
+            or not (message.mention_everyone or self._has_image_attachment(message))
         ):
             return
+
+        await self._send_deletion_log(message)
 
         try:
             await message.delete()
@@ -47,8 +60,6 @@ class ProtectedUsers(commands.Cog):
         except discord.HTTPException:
             log.exception("Failed to delete protected user's message %s", message.id)
             return
-
-        await self._send_deletion_log(message)
 
     async def _send_deletion_log(self, message: discord.Message) -> None:
         if not PROTECTED_LOG_CHANNEL_ID:
@@ -83,6 +94,25 @@ class ProtectedUsers(commands.Cog):
         embed.set_footer(text=f"Message ID: {message.id}")
 
         try:
-            await channel.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+            files = []
+            for attachment in message.attachments:
+                if (
+                    (attachment.content_type or "").startswith("image/")
+                    or PurePosixPath(attachment.filename).suffix.lower()
+                    in {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".avif"}
+                ):
+                    data = await attachment.read()
+                    files.append(
+                        discord.File(
+                            io.BytesIO(data),
+                            filename=f"{attachment.id}-{attachment.filename}",
+                        )
+                    )
+
+            await channel.send(
+                embed=embed,
+                files=files,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
         except discord.HTTPException:
             log.exception("Failed to send protected-user deletion log for message %s", message.id)
