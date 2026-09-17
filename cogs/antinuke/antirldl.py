@@ -88,32 +88,8 @@ class AntiRoleDelete(commands.Cog):
             if whitelist_status and whitelist_status[0]:
                 return
 
-        await self.ban_executor_and_recreate_role(guild, executor, role)
+        await self.ban_executor(guild, executor)
         await asyncio.sleep(2)
-
-    async def ban_executor_and_recreate_role(self, guild, executor, role):
-        retries = 3
-        while retries > 0:
-            try:
-                await self.ban_executor(guild, executor)
-                await self.recreate_role(guild, role)
-                return
-            except discord.Forbidden:
-                return
-            except discord.HTTPException as e:
-                if e.status == 429:
-                    retry_after = e.response.headers.get('Retry-After')
-                    if retry_after:
-                        await asyncio.sleep(float(retry_after))
-                        retries -= 1
-                else:
-                    return
-            except discord.errors.RateLimited as e:
-                await asyncio.sleep(e.retry_after)
-                retries -= 1
-            except Exception:
-                return
-        return
 
     async def ban_executor(self, guild, executor):
         retries = 3
@@ -138,22 +114,3 @@ class AntiRoleDelete(commands.Cog):
                 return
         return
 
-    async def recreate_role(self, guild, role):
-        try:
-            await guild.create_role(
-                name=role.name,
-                permissions=role.permissions,
-                color=role.color,
-                hoist=role.hoist,
-                mentionable=role.mentionable,
-                reason="Role deleted by unwhitelisted user"
-            )
-        except discord.Forbidden:
-            return
-        except discord.HTTPException as e:
-            if e.status == 429:
-                retry_after = e.response.headers.get('Retry-After')
-                if retry_after:
-                    await asyncio.sleep(float(retry_after))
-        except Exception:
-            return
