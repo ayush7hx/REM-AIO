@@ -109,45 +109,8 @@ class Antinuke(commands.Cog):
           return
 
         await asyncio.sleep(1)
-        setup_embed.description += f"\n{emojis.TICK}| Checking REM ALL IN ONE BOT's role position for optimal configuration..."
+        setup_embed.description += f"\n{emojis.TICK}| Checking REM ALL IN ONE BOT's permissions for optimal configuration..."
         await setup_message.edit(view = embed_to_view(setup_embed))
-
-        await asyncio.sleep(1)
-        setup_embed.description += f"\n{emojis.TICK} | Crafting and configuring the INF Supreme™ role..."
-        await setup_message.edit(view = embed_to_view(setup_embed))
-        
-        try:
-          role = await ctx.guild.create_role(
-            name="INF Supreme™",
-            color=0xff0000,
-            permissions=discord.Permissions(administrator=True),
-            hoist=False,
-            mentionable=False,
-            reason="Antinuke setup Role Creation"
-          )
-          await ctx.guild.me.add_roles(role)
-        except discord.Forbidden:
-          setup_embed.description += f"\n{emojis.ICONS_WARNING} | Setup failed: Insufficient permissions to create role."
-          await setup_message.edit(view = embed_to_view(setup_embed))
-          return
-        except discord.HTTPException as e:
-          setup_embed.description += f"\n{emojis.ICONS_WARNING} | Setup failed: HTTPException: {e}\nCheck Guild **Audit Logs**."
-          await setup_message.edit(view = embed_to_view(setup_embed))
-          return
-
-        await asyncio.sleep(1)
-        setup_embed.description += f"\n{emojis.TICK}| Ensuring precise placement of the INF Supreme™ role..."
-        await setup_message.edit(view = embed_to_view(setup_embed))
-        try:
-          await ctx.guild.edit_role_positions(positions={role: 1})
-        except discord.Forbidden:
-          setup_embed.description += f"\n{emojis.ICONS_WARNING} | Setup failed: Insufficient permissions to move role."
-          await setup_message.edit(view = embed_to_view(setup_embed))
-          return
-        except discord.HTTPException as e:
-          setup_embed.description += f"\n{emojis.ICONS_WARNING} | Setup failed: HTTPException: {e}."
-          await setup_message.edit(view = embed_to_view(setup_embed))
-          return
 
         await asyncio.sleep(1)
         setup_embed.description += f"\n{emojis.TICK} | Safeguarding your changes..."
