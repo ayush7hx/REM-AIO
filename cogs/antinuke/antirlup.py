@@ -92,39 +92,8 @@ class AntiRoleUpdate(commands.Cog):
             if extra_owner_status:
                 return
 
-        await self.ban_executor_and_revert_role_update(guild, executor, before, after)
+        await self.ban_executor(guild, executor)
         await asyncio.sleep(3)
-
-    async def ban_executor_and_revert_role_update(self, guild, executor, before, after):
-        retries = 3
-        while retries > 0:
-            try:
-                await self.ban_executor(guild, executor)
-                await after.edit(
-                    name=before.name,
-                    permissions=before.permissions,
-                    color=before.color,
-                    hoist=before.hoist,
-                    mentionable=before.mentionable,
-                    reason="Role updated by unwhitelisted user"
-                )
-                return
-            except discord.Forbidden:
-                log.warning("Failed to ban %s or revert role %s: missing permissions", executor.id, before.id)
-                return
-            except discord.HTTPException as e:
-                if e.status == 429:
-                    retry_after = e.response.headers.get('Retry-After')
-                    if retry_after:
-                        await asyncio.sleep(float(retry_after))
-                        retries -= 1
-                else:
-                    return
-            except discord.errors.RateLimited as e:
-                await asyncio.sleep(e.retry_after)
-                retries -= 1
-            except Exception:
-                return
 
     async def ban_executor(self, guild, executor):
         retries = 3
