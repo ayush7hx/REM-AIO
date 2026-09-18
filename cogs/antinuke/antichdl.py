@@ -34,18 +34,21 @@ class AntiChannelDelete(commands.Cog):
             return False
         return True
 
-    async def fetch_audit_logs(self, guild, action, target_id):
+    async def fetch_audit_logs(self, guild, action, target_id, retries=5):
         if not guild.me.guild_permissions.view_audit_log:
             return None
-        try:
-            async for entry in guild.audit_logs(action=action, limit=1):
-                if entry.target.id == target_id:
+        for attempt in range(retries):
+            try:
+                async for entry in guild.audit_logs(action=action, limit=10):
+                    if entry.target.id != target_id:
+                        continue
                     now = datetime.datetime.now(pytz.utc)
-                    if (now - entry.created_at).total_seconds() * 1000 >= 3600000:
-                        return None
-                    return entry
-        except Exception:
-            pass
+                    if (now - entry.created_at).total_seconds() * 1000 < 3600000:
+                        return entry
+            except Exception:
+                pass
+            if attempt < retries - 1:
+                await asyncio.sleep(0.5)
         return None
 
     @commands.Cog.listener()
@@ -66,12 +69,10 @@ class AntiChannelDelete(commands.Cog):
                 return
 
             executor = logs.user
-            if (
-                not antinuke_status
-                or not antinuke_status[0]
-                or executor.id in {guild.owner_id, self.bot.user.id}
-                or executor.id in TRUSTED_TEMP_VOICE_BOT_IDS
-            ):
+            if executor.id in TRUSTED_TEMP_VOICE_BOT_IDS:
+                return
+
+            if not antinuke_status or not antinuke_status[0] or executor.id in {guild.owner_id, self.bot.user.id}:
                 await self.recreate_channel(channel)
                 return
 
