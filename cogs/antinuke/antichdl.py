@@ -4,6 +4,7 @@ from discord.ext import commands
 import asyncio
 import datetime
 import pytz
+from utils.config import NON_RECOVERABLE_CHANNEL_IDS, TRUSTED_TEMP_VOICE_BOT_IDS
 
 class AntiChannelDelete(commands.Cog):
     def __init__(self, bot):
@@ -50,6 +51,8 @@ class AntiChannelDelete(commands.Cog):
     @commands.Cog.listener()
     async def on_guild_channel_delete(self, channel):
         guild = channel.guild
+        if channel.id in NON_RECOVERABLE_CHANNEL_IDS:
+            return
         if channel.id in self.intentional_deletions:
             self.intentional_deletions.discard(channel.id)
             return
@@ -63,7 +66,12 @@ class AntiChannelDelete(commands.Cog):
                 return
 
             executor = logs.user
-            if not antinuke_status or not antinuke_status[0] or executor.id in {guild.owner_id, self.bot.user.id}:
+            if (
+                not antinuke_status
+                or not antinuke_status[0]
+                or executor.id in {guild.owner_id, self.bot.user.id}
+                or executor.id in TRUSTED_TEMP_VOICE_BOT_IDS
+            ):
                 await self.recreate_channel(channel)
                 return
 

@@ -4,6 +4,7 @@ from discord.ext import commands
 import asyncio
 import datetime
 import pytz
+from utils.config import TRUSTED_TEMP_VOICE_BOT_IDS
 
 class AntiChannelUpdate(commands.Cog):
     def __init__(self, bot):
@@ -60,7 +61,7 @@ class AntiChannelUpdate(commands.Cog):
                 return
 
             executor = logs.user
-            if executor.id in {guild.owner_id, self.bot.user.id}:
+            if executor.id in {guild.owner_id, self.bot.user.id} or executor.id in TRUSTED_TEMP_VOICE_BOT_IDS:
                 return
 
             async with db.execute("SELECT owner_id FROM extraowners WHERE guild_id = ? AND owner_id = ?", (guild.id, executor.id)) as cursor:
