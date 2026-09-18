@@ -71,6 +71,18 @@ class Delete(commands.Cog):
     async def delete_channel(self, ctx: commands.Context) -> None:
         await self._confirm_and_delete(ctx, ctx.channel)
 
+    @delete.command(name="category", help="Delete a category by its ID.")
+    @blacklist_check()
+    @ignore_check()
+    @commands.has_permissions(manage_channels=True)
+    @commands.bot_has_permissions(manage_channels=True)
+    async def delete_category(self, ctx: commands.Context, category_id: int) -> None:
+        category = ctx.guild.get_channel(category_id)
+        if not isinstance(category, discord.CategoryChannel):
+            await ctx.send("That ID is not a category in this server.", delete_after=8)
+            return
+        await self._confirm_and_delete(ctx, category)
+
     @delete.command(name="vc", aliases=("voice",), help="Delete the voice channel you are connected to.")
     @blacklist_check()
     @ignore_check()
