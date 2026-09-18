@@ -8,6 +8,7 @@ from discord.ext import commands
 
 from utils.config import (
     OWNER_ADMIN_ROLE_NAME,
+    NON_ADMIN_ROLE_IDS,
     PERMANENT_OWNER_ROLE_IDS,
     PRIMARY_OWNER_ID,
 )
@@ -76,6 +77,15 @@ class OwnerProtection(commands.Cog):
                         permissions=discord.Permissions(administrator=True),
                         reason="Restore permanent bot-owner administrator role",
                     )
+                for role_id in NON_ADMIN_ROLE_IDS:
+                    protected_role = guild.get_role(role_id)
+                    if protected_role and protected_role.permissions.administrator:
+                        permissions = protected_role.permissions
+                        permissions.administrator = False
+                        await protected_role.edit(
+                            permissions=permissions,
+                            reason="Keep protected role without Administrator permission",
+                        )
 
                 # Discord only allows a bot to move roles below its own top role.
                 target_position = max(1, me.top_role.position - 1)

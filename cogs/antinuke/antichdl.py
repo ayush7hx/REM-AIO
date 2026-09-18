@@ -10,6 +10,10 @@ class AntiChannelDelete(commands.Cog):
         self.bot = bot
         self.event_limits = {}
         self.cooldowns = {}
+        self.intentional_deletions = set()
+
+    def mark_intentional(self, channel_id):
+        self.intentional_deletions.add(channel_id)
 
     def can_fetch_audit(self, guild_id, event_name, max_requests=5, interval=10, cooldown_duration=300):
         now = datetime.datetime.now()
@@ -30,7 +34,7 @@ class AntiChannelDelete(commands.Cog):
         return True
 
     async def fetch_audit_logs(self, guild, action, target_id):
-        if not guild.me.guild_permissions.ban_members:
+        if not guild.me.guild_permissions.view_audit_log:
             return None
         try:
             async for entry in guild.audit_logs(action=action, limit=1):
@@ -46,34 +50,50 @@ class AntiChannelDelete(commands.Cog):
     @commands.Cog.listener()
     async def on_guild_channel_delete(self, channel):
         guild = channel.guild
+        if channel.id in self.intentional_deletions:
+            self.intentional_deletions.discard(channel.id)
+            return
+
+        logs = await self.fetch_audit_logs(guild, discord.AuditLogAction.channel_delete, channel.id)
         async with connect('anti.db') as db:
             async with db.execute("SELECT status FROM antinuke WHERE guild_id = ?", (guild.id,)) as cursor:
                 antinuke_status = await cursor.fetchone()
-            if not antinuke_status or not antinuke_status[0]:
-                return
-
-            if not self.can_fetch_audit(guild.id, "channel_delete"):
-                return
-
-            logs = await self.fetch_audit_logs(guild, discord.AuditLogAction.channel_delete, channel.id)
             if logs is None:
+                await self.recreate_channel(channel)
                 return
 
             executor = logs.user
-            if executor.id in {guild.owner_id, self.bot.user.id}:
+            if not antinuke_status or not antinuke_status[0] or executor.id in {guild.owner_id, self.bot.user.id}:
+                await self.recreate_channel(channel)
                 return
 
             async with db.execute("SELECT owner_id FROM extraowners WHERE guild_id = ? AND owner_id = ?", (guild.id, executor.id)) as cursor:
-                if await cursor.fetchone():
-                    return
+                extra_owner = await cursor.fetchone()
 
             async with db.execute("SELECT chdl FROM whitelisted_users WHERE guild_id = ? AND user_id = ?", (guild.id, executor.id)) as cursor:
                 whitelist_status = await cursor.fetchone()
-            if whitelist_status and whitelist_status[0]:
+            if extra_owner or (whitelist_status and whitelist_status[0]):
+                await self.recreate_channel(channel)
                 return
 
             await self.recreate_channel_and_ban(channel, executor)
-            await asyncio.sleep(3)
+
+    async def recreate_channel(self, channel, retries=3):
+        while retries > 0:
+            try:
+                new_channel = await channel.clone(reason="Channel Delete | Automatic Recovery")
+                await new_channel.edit(position=channel.position)
+                return
+            except discord.Forbidden:
+                return
+            except discord.HTTPException as error:
+                if error.status != 429:
+                    return
+                retry_after = error.response.headers.get('Retry-After') if error.response else None
+                if not retry_after:
+                    return
+                await asyncio.sleep(float(retry_after))
+                retries -= 1
 
     async def recreate_channel_and_ban(self, channel, executor, retries=3):
         while retries > 0:

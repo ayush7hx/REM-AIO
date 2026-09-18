@@ -60,6 +60,7 @@ from .commands.InviteTracker import InviteTracker
 from .commands.messages import Messages
 from .commands.msgpack import Messagespack
 from .commands.fastgreet import FastGreet
+from .commands.delete import Delete
 
 #from .commands.activity import Activity
 #____________ Events _____________
@@ -153,7 +154,7 @@ log = logging.getLogger(__name__)
 
 
 COGS_TO_LOAD = [
-    Help, General, Automod, Welcomer, Fun, Games, Extra, Voice, Owner,
+    Help, General, Automod, Welcomer, Fun, Games, Extra, Voice, Owner, Delete,
     Customrole, afk, Embed, Media, Ignore, Invcrole, Giveaway, Steal, EmojiSync,
     Ship, Timer, Blacklist, Block, Nightmode, Badges, AiStuffCog, InviteTracker,
     Antinuke, Whitelist,
