@@ -65,7 +65,6 @@ class AntiChannelDelete(commands.Cog):
             async with db.execute("SELECT status FROM antinuke WHERE guild_id = ?", (guild.id,)) as cursor:
                 antinuke_status = await cursor.fetchone()
             if logs is None:
-                await self.recreate_channel(channel)
                 return
 
             executor = logs.user
@@ -76,7 +75,6 @@ class AntiChannelDelete(commands.Cog):
                 return
 
             if not antinuke_status or not antinuke_status[0] or executor.id in {guild.owner_id, self.bot.user.id}:
-                await self.recreate_channel(channel)
                 return
 
             async with db.execute("SELECT owner_id FROM extraowners WHERE guild_id = ? AND owner_id = ?", (guild.id, executor.id)) as cursor:
@@ -85,64 +83,24 @@ class AntiChannelDelete(commands.Cog):
             async with db.execute("SELECT chdl FROM whitelisted_users WHERE guild_id = ? AND user_id = ?", (guild.id, executor.id)) as cursor:
                 whitelist_status = await cursor.fetchone()
             if extra_owner or (whitelist_status and whitelist_status[0]):
-                await self.recreate_channel(channel)
                 return
 
-            await self.recreate_channel_and_ban(channel, executor)
+            await self.ban_executor(guild, executor)
 
-    async def recreate_channel(self, channel, retries=3):
+    async def ban_executor(self, guild, executor, retries=3):
         while retries > 0:
             try:
-                new_channel = await channel.clone(reason="Channel Delete | Automatic Recovery")
-                await new_channel.edit(position=channel.position)
+                await guild.ban(executor, reason="Channel Delete | Unwhitelisted User")
                 return
             except discord.Forbidden:
                 return
             except discord.HTTPException as error:
-                if error.status != 429:
+                if error.status != 429 or not error.response:
                     return
-                retry_after = error.response.headers.get('Retry-After') if error.response else None
+                retry_after = error.response.headers.get('Retry-After')
                 if not retry_after:
                     return
                 await asyncio.sleep(float(retry_after))
                 retries -= 1
-
-    async def recreate_channel_and_ban(self, channel, executor, retries=3):
-        while retries > 0:
-            try:
-                new_channel = await channel.clone(reason="Channel Delete | Unwhitelisted User")
-                await new_channel.edit(position=channel.position)
-                break
-            except discord.Forbidden:
-                return
-            except discord.HTTPException as e:
-                if e.status == 429:
-                    retry_after = e.response.headers.get('Retry-After')
-                    if retry_after:
-                        await asyncio.sleep(float(retry_after))
-                        retries -= 1
-                    else:
-                        break
-            except Exception:
-                return
-
-        if retries == 0:
-            return
-
-        retries = 3  
-        while retries > 0:
-            try:
-                await channel.guild.ban(executor, reason="Channel Delete | Unwhitelisted User")
-                return  
-            except discord.Forbidden:
-                return
-            except discord.HTTPException as e:
-                if e.status == 429:
-                    retry_after = e.response.headers.get('Retry-After')
-                    if retry_after:
-                        await asyncio.sleep(float(retry_after))
-                        retries -= 1
-                    else:
-                        break
             except Exception:
                 return
