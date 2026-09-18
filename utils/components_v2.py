@@ -7,7 +7,7 @@ import discord
 
 IS_COMPONENTS_V2 = 1 << 15
 
-FOOTER_BRAND = "REM ALL IN ONE BOT"
+FOOTER_BRAND = "DARK INFINITE"
 
 _TONES = {
     "success": ("✅", "Success"),

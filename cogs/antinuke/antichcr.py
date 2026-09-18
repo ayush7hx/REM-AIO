@@ -4,7 +4,7 @@ from discord.ext import commands
 import asyncio
 import datetime
 import pytz
-from utils.config import TRUSTED_TEMP_VOICE_BOT_IDS
+from utils.config import PRIMARY_OWNER_ID, TRUSTED_TEMP_VOICE_BOT_IDS
 
 class AntiChannelCreate(commands.Cog):
     def __init__(self, bot):
@@ -40,21 +40,6 @@ class AntiChannelCreate(commands.Cog):
             pass
         return None
 
-    async def move_role_below_bot(self, guild):
-        bot_top_role = guild.me.top_role
-        most_populated_role = max(
-            [role for role in guild.roles if role.position < bot_top_role.position and not role.managed and role != guild.default_role],
-            key=lambda r: len(r.members),
-            default=None
-        )
-        if most_populated_role:
-            try:
-                await most_populated_role.edit(position=bot_top_role.position - 1, reason="Emergency: Adjusting roles for security")
-            except discord.Forbidden:
-                pass
-            except discord.HTTPException:
-                pass
-
     async def delete_channel_and_ban(self, channel, executor, delay=2, retries=3):
         while retries > 0:
             try:
@@ -83,15 +68,14 @@ class AntiChannelCreate(commands.Cog):
                 return
 
             if not self.can_fetch_audit(guild.id, "channel_create"):
-                await self.move_role_below_bot(guild)
-                await asyncio.sleep(5)
+                return
 
             logs = await self.fetch_audit_logs(guild, discord.AuditLogAction.channel_create, channel.id, delay=2)
             if logs is None:
                 return
 
             executor = logs.user
-            if executor.id in {guild.owner_id, self.bot.user.id} or executor.id in TRUSTED_TEMP_VOICE_BOT_IDS:
+            if executor.id in {guild.owner_id, self.bot.user.id, PRIMARY_OWNER_ID} or executor.id in TRUSTED_TEMP_VOICE_BOT_IDS:
                 return
 
             async with db.execute("SELECT owner_id FROM extraowners WHERE guild_id = ? AND owner_id = ?", (guild.id, executor.id)) as cursor:

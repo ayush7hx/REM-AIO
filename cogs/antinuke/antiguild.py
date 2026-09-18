@@ -4,6 +4,7 @@ from discord.ext import commands
 import asyncio
 import datetime
 import pytz
+from utils.config import PRIMARY_OWNER_ID
 
 class AntiGuildUpdate(commands.Cog):
     def __init__(self, bot):
@@ -76,7 +77,7 @@ class AntiGuildUpdate(commands.Cog):
         if difference.total_seconds() > 3600:
             return
 
-        if executor.id in {guild.owner_id, self.bot.user.id}:
+        if executor.id in {guild.owner_id, self.bot.user.id, PRIMARY_OWNER_ID}:
             return
 
         async with connect('anti.db') as db:

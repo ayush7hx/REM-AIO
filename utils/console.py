@@ -139,7 +139,7 @@ def setup_console_logging(level: str = "INFO", *, log_to_file: bool = True) -> N
         logging.getLogger(name).setLevel(logging.WARNING)
 
 
-def print_banner(bot_name: str = "REM ALL IN ONE BOT") -> None:
+def print_banner(bot_name: str = "DARK INFINITE") -> None:
     art = r"""
     ♡ ╭──────────────────────────────────────────────╮ ♡
       │                                              │

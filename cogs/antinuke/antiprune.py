@@ -5,6 +5,7 @@ import datetime
 import asyncio
 import logging
 import pytz
+from utils.config import PRIMARY_OWNER_ID
 
 log = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ class AntiPrune(commands.Cog):
             executor = log_entry.user
             
 
-            if executor.id in {guild.owner_id, self.bot.user.id}:
+            if executor.id in {guild.owner_id, self.bot.user.id, PRIMARY_OWNER_ID}:
                 return
 
             async with db.execute("SELECT prune FROM whitelisted_users WHERE guild_id = ? AND user_id = ?", (guild.id, executor.id)) as cursor:

@@ -5,6 +5,7 @@ import asyncio
 import datetime
 import logging
 import pytz
+from utils.config import PRIMARY_OWNER_ID
 
 log = logging.getLogger(__name__)
 
@@ -76,7 +77,7 @@ class AntiRoleUpdate(commands.Cog):
 
         executor = log_entry.user
 
-        if executor.id in {guild.owner_id, self.bot.user.id}:
+        if executor.id in {guild.owner_id, self.bot.user.id, PRIMARY_OWNER_ID}:
             return
 
         async with connect('anti.db') as db:

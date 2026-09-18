@@ -52,6 +52,12 @@ async def on_shard_connect(shard_id: int):
 async def on_ready():
     await client.wait_until_ready()
 
+    if client.user and client.user.name != NAME:
+        try:
+            await client.user.edit(username=NAME)
+        except discord.HTTPException:
+            log.warning("Could not update bot username to %s", NAME)
+
     prefix_count = len(client.commands)
     slash_count = 0
 

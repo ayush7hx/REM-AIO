@@ -8,7 +8,7 @@ import discord
 from utils.components_v2 import container, layout_view, separator, text
 from utils.cv2_compat import panel_with_actions
 
-FOOTER_BRAND = "REM ALL IN ONE BOT"
+FOOTER_BRAND = "DARK INFINITE"
 
 _HEADERS = {
     "now_playing": "♡ ⋆｡˚ **Now Playing** ˚｡⋆ ♡",

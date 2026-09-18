@@ -4,6 +4,7 @@ from discord.ext import commands
 import asyncio
 import datetime
 import pytz
+from utils.config import PRIMARY_OWNER_ID
 
 class AntiWebhookUpdate(commands.Cog):
     def __init__(self, bot):
@@ -70,7 +71,7 @@ class AntiWebhookUpdate(commands.Cog):
 
         executor = entry.user
 
-        if executor.id in {guild.owner_id, self.bot.user.id}:
+        if executor.id in {guild.owner_id, self.bot.user.id, PRIMARY_OWNER_ID}:
             return
 
         async with connect('anti.db') as db:

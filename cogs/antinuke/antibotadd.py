@@ -4,6 +4,7 @@ from discord.ext import commands
 import asyncio
 import datetime
 import pytz
+from utils.config import PRIMARY_OWNER_ID
 
 class AntiBotAdd(commands.Cog):
     def __init__(self, bot):
@@ -64,7 +65,7 @@ class AntiBotAdd(commands.Cog):
                 return
 
             executor = logs.user
-            if executor.id in {guild.owner_id, self.bot.user.id}:
+            if executor.id in {guild.owner_id, self.bot.user.id, PRIMARY_OWNER_ID}:
                 return
 
             async with db.execute("SELECT botadd FROM whitelisted_users WHERE guild_id = ? AND user_id = ?", (guild.id, executor.id)) as cursor:

@@ -45,7 +45,7 @@ from urllib.parse import urljoin
 import yaml
 
 log = logging.getLogger(__name__)
-BOT_DISPLAY_NAME = "REM ALL IN ONE BOT"
+BOT_DISPLAY_NAME = "DARK INFINITE"
 
 SPOTIFY_TRACK_REGEX = r"https?://open\.spotify\.com/track/([a-zA-Z0-9]+)"
 SPOTIFY_PLAYLIST_REGEX = r"https?://open\.spotify\.com/playlist/([a-zA-Z0-9]+)"
