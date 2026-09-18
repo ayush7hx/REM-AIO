@@ -317,6 +317,68 @@ class Owner(commands.Cog):
         except discord.Forbidden:
             await ctx.send("This user might be having DMs blocked or it's a bot account...")           
 
+    @commands.group(name="announce", aliases=["broadcast"], invoke_without_command=True)
+    @commands.is_owner()
+    async def announce(self, ctx: Context):
+        """Send an owner announcement to this server or one member."""
+        if ctx.invoked_subcommand is None:
+            await ctx.send_help(ctx.command)
+
+    @announce.command(name="user", aliases=["member"])
+    @commands.is_owner()
+    async def announce_user(self, ctx: Context, user: discord.User, *, message: str):
+        """Send an announcement DM to one user."""
+        try:
+            await user.send(message)
+        except discord.Forbidden:
+            await ctx.reply("This user has DMs disabled or does not accept messages.", mention_author=False)
+            return
+        except discord.HTTPException:
+            await ctx.reply("Discord rejected this DM. Please try again later.", mention_author=False)
+            return
+
+        await ctx.reply(
+            f"{emojis.TICK} | Announcement sent to **{user}**.",
+            mention_author=False,
+        )
+
+    @announce.command(name="all", aliases=["server"])
+    @commands.is_owner()
+    @commands.guild_only()
+    @commands.cooldown(1, 60, commands.BucketType.user)
+    async def announce_all(self, ctx: Context, *, message: str):
+        """DM an announcement to every non-bot member in this server."""
+        members = [member for member in ctx.guild.members if not member.bot]
+        if not members:
+            await ctx.reply("There are no eligible members in this server.", mention_author=False)
+            return
+
+        progress = await ctx.reply(
+            f"Sending announcement to **{len(members)}** members...",
+            mention_author=False,
+        )
+        sent = 0
+        failed = 0
+        stopped_by_rate_limit = False
+
+        for member in members:
+            try:
+                await member.send(message)
+                sent += 1
+            except discord.Forbidden:
+                failed += 1
+            except discord.HTTPException as error:
+                if error.status == 429:
+                    stopped_by_rate_limit = True
+                    break
+                failed += 1
+            await asyncio.sleep(1.5)
+
+        status = f"{emojis.TICK} | Sent: **{sent}** | Failed: **{failed}**"
+        if stopped_by_rate_limit:
+            status += "\nStopped because Discord returned a rate limit."
+        await progress.edit(content=status)
+
 
 
     @commands.group()
