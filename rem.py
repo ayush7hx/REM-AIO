@@ -33,6 +33,7 @@ _shutdown_done = False
 _loop: asyncio.AbstractEventLoop | None = None
 _bot_task: asyncio.Task | None = None
 _shutdown_task: asyncio.Task | None = None
+_unexpected_stop = False
 _interrupt_count = 0
 _interrupt_at = 0.0
 
@@ -225,11 +226,28 @@ def _register_signal_handlers(loop: asyncio.AbstractEventLoop) -> None:
 
 async def _run_bot() -> None:
     await client.load_extension("jishaku")
-    await client.start(TOKEN)
+    while not client.is_closed() and not client._shutting_down:
+        try:
+            await client.start(TOKEN)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.exception("Discord client stopped with an error")
+            if client._shutting_down:
+                return
+            await asyncio.sleep(5)
+        else:
+            if client._shutting_down:
+                return
+            if client.is_closed():
+                raise RuntimeError("Discord client closed unexpectedly")
+            else:
+                log.error("Discord client stopped unexpectedly; reconnecting in 5 seconds")
+                await asyncio.sleep(5)
 
 
 async def main():
-    global _loop, _bot_task
+    global _loop, _bot_task, _unexpected_stop
     _loop = asyncio.get_running_loop()
 
     console.print_banner(NAME)
@@ -258,6 +276,10 @@ async def main():
         await _bot_task
     except asyncio.CancelledError:
         pass
+    except Exception:
+        _unexpected_stop = True
+        log.exception("Bot task exited unexpectedly")
+        raise
     finally:
         await _wait_for_shutdown()
 
@@ -268,5 +290,9 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         pass
     finally:
-        console.info("REM stopped cleanly.")
-        sys.exit(0)
+        if _shutdown_done and not _unexpected_stop:
+            console.info("REM stopped cleanly.")
+            sys.exit(0)
+        else:
+            console.error("REM stopped unexpectedly.")
+            sys.exit(1)
