@@ -196,7 +196,12 @@ class Mute(commands.Cog):
 
     @mute.error
     async def mute_error(self, ctx, error):
-        
+        if isinstance(error, commands.CommandInvokeError):
+            error = error.original
+
+        if isinstance(error, discord.HTTPException) and error.status == 429:
+            return
+
         if isinstance(error, commands.BotMissingPermissions):
             embed = discord.Embed(title=f"{emojis.CROSSICON}> Access Denied", description="I don't have permission to mute members.", color=self.color)
             await ctx.send(view = embed_to_view(embed))

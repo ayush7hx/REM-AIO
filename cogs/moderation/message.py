@@ -51,8 +51,10 @@ async def do_removal(ctx, limit, predicate, *, before=None, after=None):
       deleted = await ctx.channel.purge(limit=limit, before=before, after=after, check=predicate)
   except discord.Forbidden as e:
       return await ctx.error("I do not have permissions to delete messages.")
-  except discord.HTTPException as e:
-      return await ctx.error(f"Error: {e} (try a smaller search?)")
+  except discord.HTTPException as error:
+      if error.status == 429:
+          return
+      return await ctx.send(f"Error: {error} (try a smaller search?)")
 
   spammers = Counter(m.author.display_name for m in deleted)
   deleted = len(deleted)
@@ -84,7 +86,10 @@ class Message(commands.Cog):
   @commands.has_permissions(manage_messages=True)
   @bot_has_permissions(manage_messages=True)
   async def clear(self, ctx, Choice: Union[discord.Member, int], Amount: int = None):
-        await ctx.message.delete()
+        try:
+            await ctx.message.delete()
+        except discord.HTTPException:
+            pass
 
         if isinstance(Choice, discord.Member):
             search = Amount or 5
@@ -102,7 +107,10 @@ class Message(commands.Cog):
   @commands.has_permissions(manage_messages=True)
   @bot_has_permissions(manage_messages=True)
   async def embeds(self, ctx, search=100):
-        await ctx.message.delete()
+        try:
+            await ctx.message.delete()
+        except discord.HTTPException:
+            pass
         await do_removal(ctx, search, lambda e: len(e.embeds))
 
 
@@ -114,7 +122,10 @@ class Message(commands.Cog):
   @bot_has_permissions(manage_messages=True)
   async def files(self, ctx, search=100):
 
-        await ctx.message.delete()
+        try:
+            await ctx.message.delete()
+        except discord.HTTPException:
+            pass
         await do_removal(ctx, search, lambda e: len(e.attachments))
 
   @clear.command(help="Clears the messages having images")
