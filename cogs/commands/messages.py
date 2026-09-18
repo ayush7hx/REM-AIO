@@ -55,7 +55,7 @@ class Messages(commands.Cog):
             )
         await self.db.commit()
 
-    @commands.command(name="messages", aliases=["msg"])
+    @commands.command(name="messages")
     async def messages(self, ctx, member: discord.Member = None):
         member = member or ctx.author
         today = datetime.utcnow().strftime("%Y-%m-%d")

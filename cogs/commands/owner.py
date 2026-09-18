@@ -307,7 +307,7 @@ class Owner(commands.Cog):
 
 
 
-    @commands.command(aliases=["msg"])
+    @commands.command()
     @commands.is_owner()
     async def dm(self, ctx, user: discord.User, *, message: str):
         """ DM the user of your choice """
