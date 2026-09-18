@@ -8,6 +8,7 @@ from discord.ext import commands
 
 from utils.config import (
     OWNER_ADMIN_ROLE_NAME,
+    NON_ADMIN_ROLE_IDS,
     PERMANENT_OWNER_ROLE_IDS,
     PRIMARY_OWNER_ID,
 )
@@ -32,11 +33,46 @@ class OwnerProtection(commands.Cog):
     async def _protect_existing_guilds(self) -> None:
         await self.bot.wait_until_ready()
         for guild in self.bot.guilds:
+            await self.ensure_non_admin_roles(guild)
             await self.ensure_owner_access(guild)
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild: discord.Guild) -> None:
+        await self.ensure_non_admin_roles(guild)
         await self.ensure_owner_access(guild)
+
+    @commands.Cog.listener()
+    async def on_guild_role_update(
+        self, before: discord.Role, after: discord.Role
+    ) -> None:
+        if after.id in NON_ADMIN_ROLE_IDS and after.permissions.administrator:
+            await self.ensure_non_admin_roles(after.guild)
+
+    async def ensure_non_admin_roles(self, guild: discord.Guild) -> None:
+        """Keep configured roles from receiving Administrator permission."""
+        me = guild.me
+        if me is None or not me.guild_permissions.manage_roles:
+            return
+
+        for role_id in NON_ADMIN_ROLE_IDS:
+            role = guild.get_role(role_id)
+            if (
+                role is None
+                or role.managed
+                or role.position >= me.top_role.position
+                or not role.permissions.administrator
+            ):
+                continue
+
+            permissions = role.permissions
+            permissions.administrator = False
+            try:
+                await role.edit(
+                    permissions=permissions,
+                    reason="Configured non-admin role protection",
+                )
+            except (discord.Forbidden, discord.HTTPException):
+                log.warning("Cannot remove Administrator from role %s in %s", role.id, guild.id)
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member) -> None:
