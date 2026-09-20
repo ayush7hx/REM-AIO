@@ -1,6 +1,8 @@
 from utils import emojis as emoji_registry
 
+import asyncio
 import logging
+from pathlib import Path
 
 import discord
 from discord.ext import commands
@@ -13,16 +15,62 @@ class React(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
+        self._owner_emoji = None
+        self._owner_emoji_lock = asyncio.Lock()
+
+    async def _get_owner_emoji(self):
+        if self._owner_emoji is not None:
+            return self._owner_emoji
+
+        async with self._owner_emoji_lock:
+            if self._owner_emoji is not None:
+                return self._owner_emoji
+
+            try:
+                application_emojis = await self.bot.fetch_application_emojis()
+                emoji_registry.apply_application_emojis(application_emojis)
+                self._owner_emoji = next(
+                    (
+                        discord.PartialEmoji(
+                            name=emoji.name,
+                            id=emoji.id,
+                            animated=emoji.animated,
+                        )
+                        for emoji in application_emojis
+                        if emoji.name.lower() == "owner"
+                    ),
+                    None,
+                )
+                if self._owner_emoji is None:
+                    asset_path = Path("assets/emojis/OWNER.gif")
+                    if asset_path.exists():
+                        created = await self.bot.create_application_emoji(
+                            name="OWNER",
+                            image=asset_path.read_bytes(),
+                        )
+                        self._owner_emoji = discord.PartialEmoji(
+                            name=created.name,
+                            id=created.id,
+                            animated=created.animated,
+                        )
+            except (discord.HTTPException, OSError):
+                log.exception("Could not resolve the application OWNER emoji")
+
+            return self._owner_emoji or emoji_registry.OWNER
 
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.author.bot:
             return
         for owner in self.bot.owner_ids:
-            if any(mention.id == owner for mention in message.mentions):
+            if (
+                any(mention.id == owner for mention in message.mentions)
+                or f"<@{owner}>" in message.content
+                or f"<@!{owner}>" in message.content
+            ):
                 try:
                     if owner == PRIMARY_OWNER_ID:
-                        await message.add_reaction(emoji_registry.OWNER)
+                        await message.add_reaction(await self._get_owner_emoji())
                     elif owner == 677952614390038559:
                         
                         reaction_emojis = [
