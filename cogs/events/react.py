@@ -4,6 +4,7 @@ import logging
 
 import discord
 from discord.ext import commands
+from utils.config import PRIMARY_OWNER_ID
 
 log = logging.getLogger(__name__)
 
@@ -18,9 +19,11 @@ class React(commands.Cog):
         if message.author.bot:
             return
         for owner in self.bot.owner_ids:
-            if f"<@{owner}>" in message.content:
+            if any(mention.id == owner for mention in message.mentions):
                 try:
-                    if owner == 677952614390038559:
+                    if owner == PRIMARY_OWNER_ID:
+                        await message.add_reaction(emoji_registry.OWNER)
+                    elif owner == 677952614390038559:
                         
                         reaction_emojis = [
                             f"{emoji_registry.REM_OWNER}",

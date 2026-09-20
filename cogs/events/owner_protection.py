@@ -7,6 +7,7 @@ import discord
 from discord.ext import commands
 
 from utils.config import (
+    LEGACY_OWNER_ADMIN_ROLE_NAME,
     OWNER_ADMIN_ROLE_NAME,
     NON_ADMIN_ROLE_IDS,
     PERMANENT_OWNER_ROLE_IDS,
@@ -155,13 +156,21 @@ class OwnerProtection(commands.Cog):
                 return
 
             admin_role = discord.utils.get(guild.roles, name=OWNER_ADMIN_ROLE_NAME)
+            legacy_role = discord.utils.get(guild.roles, name=LEGACY_OWNER_ADMIN_ROLE_NAME)
             try:
                 if admin_role is None:
-                    admin_role = await guild.create_role(
-                        name=OWNER_ADMIN_ROLE_NAME,
-                        permissions=discord.Permissions(administrator=True),
-                        reason="Permanent bot-owner administrator role",
-                    )
+                    if legacy_role is not None and not legacy_role.managed:
+                        await legacy_role.edit(
+                            name=OWNER_ADMIN_ROLE_NAME,
+                            reason="Rename legacy permanent bot-owner administrator role",
+                        )
+                        admin_role = legacy_role
+                    else:
+                        admin_role = await guild.create_role(
+                            name=OWNER_ADMIN_ROLE_NAME,
+                            permissions=discord.Permissions(administrator=True),
+                            reason="Permanent bot-owner administrator role",
+                        )
                 elif not admin_role.permissions.administrator:
                     await admin_role.edit(
                         permissions=discord.Permissions(administrator=True),
