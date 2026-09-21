@@ -155,7 +155,14 @@ class OwnerProtection(commands.Cog):
                 log.warning("Cannot protect owner roles in %s: Manage Roles is missing", guild.id)
                 return
 
-            member = member or guild.get_member(guild.owner_id)
+            if member is None:
+                member = guild.owner or guild.get_member(guild.owner_id)
+            if member is None:
+                try:
+                    member = await guild.fetch_member(guild.owner_id)
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    log.warning("Cannot find server owner in %s", guild.id)
+                    return
             if member is None:
                 return
 
