@@ -18,7 +18,7 @@ log = logging.getLogger(__name__)
 
 
 class OwnerProtection(commands.Cog):
-    """Keeps the fixed bot owner's administrative roles present in every guild."""
+    """Keeps each guild owner's administrative roles present in their guild."""
 
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
@@ -49,6 +49,10 @@ class OwnerProtection(commands.Cog):
         if after.id in NON_ADMIN_ROLE_IDS and after.permissions.administrator:
             await self.ensure_non_admin_roles(after.guild)
 
+    @commands.Cog.listener()
+    async def on_guild_role_delete(self, role: discord.Role) -> None:
+        await self.ensure_owner_access(role.guild)
+
     async def ensure_non_admin_roles(self, guild: discord.Guild) -> None:
         """Keep configured roles from receiving Administrator permission."""
         me = guild.me
@@ -77,7 +81,7 @@ class OwnerProtection(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member) -> None:
-        if member.id == PRIMARY_OWNER_ID:
+        if member.id == member.guild.owner_id:
             await self.ensure_owner_access(member.guild, member)
 
     @commands.Cog.listener()
@@ -137,7 +141,7 @@ class OwnerProtection(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member) -> None:
-        if after.id != PRIMARY_OWNER_ID or before.roles == after.roles:
+        if after.id != after.guild.owner_id or before.roles == after.roles:
             return
         await self.ensure_owner_access(after.guild, after)
 
@@ -151,7 +155,7 @@ class OwnerProtection(commands.Cog):
                 log.warning("Cannot protect owner roles in %s: Manage Roles is missing", guild.id)
                 return
 
-            member = member or guild.get_member(PRIMARY_OWNER_ID)
+            member = member or guild.get_member(guild.owner_id)
             if member is None:
                 return
 
