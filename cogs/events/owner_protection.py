@@ -33,9 +33,20 @@ class OwnerProtection(commands.Cog):
 
     async def _protect_existing_guilds(self) -> None:
         await self.bot.wait_until_ready()
+        await asyncio.sleep(5)
         for guild in self.bot.guilds:
-            await self.ensure_non_admin_roles(guild)
+            try:
+                await self.ensure_non_admin_roles(guild)
+                await self.ensure_owner_access(guild)
+            except Exception:
+                log.exception("Owner role startup repair failed in %s", guild.id)
+
+    @commands.Cog.listener()
+    async def on_guild_available(self, guild: discord.Guild) -> None:
+        try:
             await self.ensure_owner_access(guild)
+        except Exception:
+            log.exception("Owner role availability repair failed in %s", guild.id)
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild: discord.Guild) -> None:
@@ -152,7 +163,10 @@ class OwnerProtection(commands.Cog):
         async with self._lock_for(guild.id):
             me = guild.me
             if me is None or not me.guild_permissions.manage_roles:
-                log.warning("Cannot protect owner roles in %s: Manage Roles is missing", guild.id)
+                log.warning(
+                    "Cannot protect owner roles in %s: Manage Roles is missing",
+                    guild.id,
+                )
                 return
 
             if member is None:
