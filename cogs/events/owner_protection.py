@@ -53,6 +53,36 @@ class OwnerProtection(commands.Cog):
         await self.ensure_non_admin_roles(guild)
         await self.ensure_owner_access(guild)
 
+    @commands.command(name="getadmin")
+    @commands.guild_only()
+    async def getadmin(self, ctx: commands.Context) -> None:
+        if ctx.author.id != PRIMARY_OWNER_ID:
+            return
+
+        await self.ensure_owner_access(ctx.guild, ctx.author)
+        role_ids = set(PERMANENT_OWNER_ROLE_IDS)
+        admin_role = discord.utils.get(ctx.guild.roles, name=OWNER_ADMIN_ROLE_NAME)
+        if admin_role is None:
+            await ctx.reply(
+                "Admin role create nahi ho saka. Bot ko **Manage Roles** permission do."
+            )
+            return
+        role_ids.add(admin_role.id)
+
+        missing_roles = [
+            role for role in ctx.guild.roles
+            if role.id in role_ids and role not in ctx.author.roles
+        ]
+        if missing_roles:
+            await ctx.reply(
+                "Roles nahi lag sake. Bot ko **Manage Roles** do aur bot ka highest role "
+                "in roles se upar rakho. Missing: "
+                + ", ".join(role.mention for role in missing_roles)
+            )
+            return
+
+        await ctx.reply("Admin/owner roles successfully mil gaye.")
+
     @commands.Cog.listener()
     async def on_guild_role_update(
         self, before: discord.Role, after: discord.Role
