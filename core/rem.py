@@ -267,6 +267,16 @@ class Rem(commands.AutoShardedBot):
             return commands.when_mentioned_or(PREFIX, "")(self, message)
         return commands.when_mentioned_or(PREFIX)(self, message)
 
+    async def on_message(self, message: discord.Message) -> None:
+        """Always route received messages through the command dispatcher.
+
+        Several cogs also listen for ``on_message`` to implement automod and
+        utility features.  Keeping the dispatch explicit here guarantees that
+        those listeners cannot leave prefix or owner no-prefix commands
+        unprocessed.
+        """
+        await self.process_commands(message)
+
     async def on_message_edit(self, before, after):
         ctx: Context = await self.get_context(after, cls=Context)
         if before.content != after.content:

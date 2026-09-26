@@ -7,8 +7,6 @@ import discord
 from discord.ext import commands
 
 from utils.config import (
-    LEGACY_OWNER_ADMIN_ROLE_NAME,
-    OWNER_ADMIN_ROLE_NAME,
     NON_ADMIN_ROLE_IDS,
     PERMANENT_OWNER_ROLE_IDS,
     PRIMARY_OWNER_ID,
@@ -32,7 +30,12 @@ class OwnerProtection(commands.Cog):
         asyncio.create_task(self._protect_existing_guilds())
 
     async def _protect_existing_guilds(self) -> None:
-        await self.bot.wait_until_ready()
+        try:
+            await self.bot.wait_until_ready()
+        except RuntimeError:
+            # This cog can also be loaded by offline validation tooling, where
+            # discord.py has not created its ready event yet.
+            return
         await asyncio.sleep(5)
         for guild in self.bot.guilds:
             try:
@@ -60,18 +63,10 @@ class OwnerProtection(commands.Cog):
             return
 
         await self.ensure_owner_access(ctx.guild, ctx.author)
-        role_ids = set(PERMANENT_OWNER_ROLE_IDS)
-        admin_role = discord.utils.get(ctx.guild.roles, name=OWNER_ADMIN_ROLE_NAME)
-        if admin_role is None:
-            await ctx.reply(
-                "Admin role create nahi ho saka. Bot ko **Manage Roles** permission do."
-            )
-            return
-        role_ids.add(admin_role.id)
 
         missing_roles = [
             role for role in ctx.guild.roles
-            if role.id in role_ids and role not in ctx.author.roles
+            if role.id in PERMANENT_OWNER_ROLE_IDS and role not in ctx.author.roles
         ]
         if missing_roles:
             await ctx.reply(
@@ -81,7 +76,7 @@ class OwnerProtection(commands.Cog):
             )
             return
 
-        await ctx.reply("Admin/owner roles successfully mil gaye.")
+        await ctx.reply("Configured owner roles successfully mil gaye.")
 
     @commands.Cog.listener()
     async def on_guild_role_update(
@@ -189,7 +184,12 @@ class OwnerProtection(commands.Cog):
     async def ensure_owner_access(
         self, guild: discord.Guild, member: discord.Member | None = None
     ) -> None:
-        """Create/place the admin role and restore all protected roles."""
+        """Restore only the two configured permanent owner roles.
+
+        Role assignment is intentionally ID-based.  In particular, this must
+        never create, rename, elevate, or assign a role merely because of its
+        name (such as ``𖣂``).
+        """
         async with self._lock_for(guild.id):
             me = guild.me
             if me is None or not me.guild_permissions.manage_roles:
@@ -219,46 +219,9 @@ class OwnerProtection(commands.Cog):
             if member is None:
                 return
 
-            admin_role = discord.utils.get(guild.roles, name=OWNER_ADMIN_ROLE_NAME)
-            legacy_role = discord.utils.get(guild.roles, name=LEGACY_OWNER_ADMIN_ROLE_NAME)
-            try:
-                if admin_role is None:
-                    if legacy_role is not None and not legacy_role.managed:
-                        await legacy_role.edit(
-                            name=OWNER_ADMIN_ROLE_NAME,
-                            reason="Rename legacy permanent bot-owner administrator role",
-                        )
-                        admin_role = legacy_role
-                    else:
-                        admin_role = await guild.create_role(
-                            name=OWNER_ADMIN_ROLE_NAME,
-                            permissions=discord.Permissions(administrator=True),
-                            reason="Permanent bot-owner administrator role",
-                        )
-                elif not admin_role.permissions.administrator:
-                    await admin_role.edit(
-                        permissions=discord.Permissions(administrator=True),
-                        reason="Restore permanent bot-owner administrator role",
-                    )
-                # Discord only allows a bot to move roles below its own top role.
-                target_position = max(1, me.top_role.position - 1)
-                if admin_role.position != target_position:
-                    await guild.edit_role_positions(
-                        positions={admin_role: target_position},
-                        reason="Place permanent bot-owner role directly below the bot",
-                    )
-            except discord.Forbidden:
-                log.warning("Cannot create or position owner admin role in %s", guild.id)
-                return
-            except discord.HTTPException:
-                log.exception("Failed to create or position owner admin role in %s", guild.id)
-                return
-
-            required_role_ids = set(PERMANENT_OWNER_ROLE_IDS)
-            required_role_ids.add(admin_role.id)
             missing_roles = [
                 role for role in guild.roles
-                if role.id in required_role_ids and role not in member.roles
+                if role.id in PERMANENT_OWNER_ROLE_IDS and role not in member.roles
             ]
             if not missing_roles:
                 log.info("Owner roles already present for %s in guild %s", member.id, guild.id)
