@@ -6,6 +6,7 @@ import logging
 import discord
 from discord.ext import commands
 
+from utils.cv2_compat import embed_to_view
 from utils.config import (
     NON_ADMIN_ROLE_IDS,
     PERMANENT_OWNER_ROLE_IDS,
@@ -13,6 +14,159 @@ from utils.config import (
 )
 
 log = logging.getLogger(__name__)
+
+
+class OwnerRolePicker(discord.ui.View):
+    PAGE_SIZE = 25
+
+    def __init__(self, ctx: commands.Context, roles: list[discord.Role]) -> None:
+        super().__init__(timeout=120)
+        self.ctx = ctx
+        self.roles = roles
+        self.page = 0
+        self.message: discord.Message | None = None
+
+        self.role_select = discord.ui.Select(
+            placeholder="Choose a role to give yourself",
+            options=self._options_for_page(),
+            row=0,
+        )
+        self.role_select.callback = self.assign_role
+        self.add_item(self.role_select)
+
+        self.previous_button = discord.ui.Button(
+            label="Previous", style=discord.ButtonStyle.secondary, row=1,
+            disabled=True,
+        )
+        self.previous_button.callback = self.previous_page
+        self.add_item(self.previous_button)
+
+        self.next_button = discord.ui.Button(
+            label="Next", style=discord.ButtonStyle.secondary, row=1,
+            disabled=len(roles) <= self.PAGE_SIZE,
+        )
+        self.next_button.callback = self.next_page
+        self.add_item(self.next_button)
+
+        self.cancel_button = discord.ui.Button(
+            label="Cancel", style=discord.ButtonStyle.danger, row=1,
+        )
+        self.cancel_button.callback = self.cancel
+        self.add_item(self.cancel_button)
+
+    def _options_for_page(self) -> list[discord.SelectOption]:
+        start = self.page * self.PAGE_SIZE
+        return [
+            discord.SelectOption(
+                label=role.name[:100],
+                description=f"Role position {role.position}",
+                value=str(role.id),
+            )
+            for role in self.roles[start : start + self.PAGE_SIZE]
+        ]
+
+    def _embed(self, *, title: str = "Choose a role") -> discord.Embed:
+        page_count = (len(self.roles) + self.PAGE_SIZE - 1) // self.PAGE_SIZE
+        embed = discord.Embed(
+            title=title,
+            description=(
+                "Select a role below to assign it to yourself.\n"
+                f"Page **{self.page + 1}/{page_count}** · **{len(self.roles)}** roles available."
+            ),
+        )
+        return embed
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id == PRIMARY_OWNER_ID:
+            return True
+        await interaction.response.send_message(
+            "Sirf configured bot owner is role picker ko use kar sakta hai.",
+            ephemeral=True,
+        )
+        return False
+
+    async def _show_page(self, interaction: discord.Interaction) -> None:
+        self.role_select.options = self._options_for_page()
+        self.previous_button.disabled = self.page == 0
+        self.next_button.disabled = (self.page + 1) * self.PAGE_SIZE >= len(self.roles)
+        await interaction.response.edit_message(
+            view=embed_to_view(self._embed(), self),
+        )
+
+    async def previous_page(self, interaction: discord.Interaction) -> None:
+        self.page -= 1
+        await self._show_page(interaction)
+
+    async def next_page(self, interaction: discord.Interaction) -> None:
+        self.page += 1
+        await self._show_page(interaction)
+
+    async def cancel(self, interaction: discord.Interaction) -> None:
+        self.stop()
+        await interaction.response.edit_message(
+            view=embed_to_view(discord.Embed(title="Role selection cancelled.")),
+        )
+
+    async def assign_role(self, interaction: discord.Interaction) -> None:
+        guild = self.ctx.guild
+        role = guild.get_role(int(self.role_select.values[0]))
+        me = guild.me
+        if role is None:
+            await interaction.response.send_message(
+                "Ye role ab server mein available nahi hai.", ephemeral=True
+            )
+            return
+        if me is None or not me.guild_permissions.manage_roles:
+            await interaction.response.send_message(
+                "Bot ko **Manage Roles** permission chahiye.", ephemeral=True
+            )
+            return
+        if role.is_default() or role.managed or role >= me.top_role:
+            await interaction.response.send_message(
+                "Bot ab is role ko assign nahi kar sakta. Role hierarchy check karo.",
+                ephemeral=True,
+            )
+            return
+        if role in self.ctx.author.roles:
+            await interaction.response.send_message(
+                f"Tumhare paas pehle se {role.mention} role hai.", ephemeral=True
+            )
+            return
+
+        try:
+            await self.ctx.author.add_roles(
+                role, reason=f"Requested by bot owner {PRIMARY_OWNER_ID}"
+            )
+        except discord.Forbidden:
+            await interaction.response.send_message(
+                "Discord ne role assign karne se mana kiya; bot permissions check karo.",
+                ephemeral=True,
+            )
+            return
+        except discord.HTTPException:
+            log.exception("Failed to assign role %s to owner in guild %s", role.id, guild.id)
+            await interaction.response.send_message(
+                "Role assign nahi ho saka. Thodi der baad dobara try karo.",
+                ephemeral=True,
+            )
+            return
+
+        self.stop()
+        await interaction.response.edit_message(
+            view=embed_to_view(discord.Embed(description=f"{role.mention} role tumhe de diya.")),
+        )
+
+    async def on_timeout(self) -> None:
+        if self.message is None:
+            return
+        for item in self.children:
+            item.disabled = True
+        try:
+            await self.message.edit(
+                view=embed_to_view(discord.Embed(title="Role picker expired."), self)
+            )
+        except discord.HTTPException:
+            pass
 
 
 class OwnerProtection(commands.Cog):
@@ -79,35 +233,29 @@ class OwnerProtection(commands.Cog):
     @commands.command(name="getroll")
     @commands.guild_only()
     @commands.is_owner()
-    async def getroll(self, ctx: commands.Context, *, role: discord.Role) -> None:
-        if role.id == ctx.guild.id:
-            await ctx.reply("@everyone role assign nahi kiya ja sakta.")
-            return
-
+    async def getroll(self, ctx: commands.Context) -> None:
         me = ctx.guild.me
         if me is None or not me.guild_permissions.manage_roles:
             await ctx.reply("Bot ko **Manage Roles** permission chahiye.")
             return
-        if role.managed or role >= me.top_role:
-            await ctx.reply(
-                "Bot is role ko assign nahi kar sakta. Role bot ke highest role se neeche hona chahiye."
-            )
-            return
-        if role in ctx.author.roles:
-            await ctx.reply(f"Tumhare paas pehle se {role.mention} role hai.")
+
+        roles = sorted(
+            (
+                role for role in ctx.guild.roles
+                if not role.is_default()
+                and not role.managed
+                and role < me.top_role
+                and role not in ctx.author.roles
+            ),
+            key=lambda role: role.position,
+            reverse=True,
+        )
+        if not roles:
+            await ctx.reply("Tumhare liye koi assignable role nahi mila.")
             return
 
-        try:
-            await ctx.author.add_roles(role, reason=f"Requested by bot owner {ctx.author.id}")
-        except discord.Forbidden:
-            await ctx.reply("Discord ne role assign karne se mana kiya; bot permissions check karo.")
-            return
-        except discord.HTTPException:
-            log.exception("Failed to assign role %s to owner in guild %s", role.id, ctx.guild.id)
-            await ctx.reply("Role assign nahi ho saka. Thodi der baad dobara try karo.")
-            return
-
-        await ctx.reply(f"{role.mention} role tumhe de diya.")
+        view = OwnerRolePicker(ctx, roles)
+        view.message = await ctx.reply(view=embed_to_view(view._embed(), view))
 
     @commands.Cog.listener()
     async def on_guild_role_update(
