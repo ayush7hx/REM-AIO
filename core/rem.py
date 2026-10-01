@@ -140,6 +140,17 @@ class Rem(commands.AutoShardedBot):
         if ctx.command is None:
             return True
 
+        if ctx.author.id != PRIMARY_OWNER_ID:
+            try:
+                await ctx.reply(
+                    "Sirf configured bot owner is bot ke commands use kar sakta hai.",
+                    delete_after=8,
+                    mention_author=False,
+                )
+            except (discord.HTTPException, asyncio.CancelledError):
+                pass
+            return False
+
         decision = await self.security.run_command_gate(ctx)
         if decision.allowed:
             return True
@@ -149,6 +160,14 @@ class Rem(commands.AutoShardedBot):
 
     async def _interaction_security_check(self, interaction: discord.Interaction) -> bool:
         if self._shutting_down or self.is_closed():
+            return False
+
+        if interaction.user.id != PRIMARY_OWNER_ID:
+            message = "Sirf configured bot owner is bot ke commands use kar sakta hai."
+            if interaction.response.is_done():
+                await interaction.followup.send(message, ephemeral=True)
+            else:
+                await interaction.response.send_message(message, ephemeral=True)
             return False
 
         decision = await self.security.run_interaction_gate(interaction)

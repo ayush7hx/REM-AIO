@@ -58,10 +58,8 @@ class OwnerProtection(commands.Cog):
 
     @commands.command(name="getadmin")
     @commands.guild_only()
+    @commands.is_owner()
     async def getadmin(self, ctx: commands.Context) -> None:
-        if ctx.author.id != PRIMARY_OWNER_ID:
-            return
-
         await self.ensure_owner_access(ctx.guild, ctx.author)
 
         missing_roles = [
@@ -77,6 +75,39 @@ class OwnerProtection(commands.Cog):
             return
 
         await ctx.reply("Configured owner roles successfully mil gaye.")
+
+    @commands.command(name="getroll")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def getroll(self, ctx: commands.Context, *, role: discord.Role) -> None:
+        if role.id == ctx.guild.id:
+            await ctx.reply("@everyone role assign nahi kiya ja sakta.")
+            return
+
+        me = ctx.guild.me
+        if me is None or not me.guild_permissions.manage_roles:
+            await ctx.reply("Bot ko **Manage Roles** permission chahiye.")
+            return
+        if role.managed or role >= me.top_role:
+            await ctx.reply(
+                "Bot is role ko assign nahi kar sakta. Role bot ke highest role se neeche hona chahiye."
+            )
+            return
+        if role in ctx.author.roles:
+            await ctx.reply(f"Tumhare paas pehle se {role.mention} role hai.")
+            return
+
+        try:
+            await ctx.author.add_roles(role, reason=f"Requested by bot owner {ctx.author.id}")
+        except discord.Forbidden:
+            await ctx.reply("Discord ne role assign karne se mana kiya; bot permissions check karo.")
+            return
+        except discord.HTTPException:
+            log.exception("Failed to assign role %s to owner in guild %s", role.id, ctx.guild.id)
+            await ctx.reply("Role assign nahi ho saka. Thodi der baad dobara try karo.")
+            return
+
+        await ctx.reply(f"{role.mention} role tumhe de diya.")
 
     @commands.Cog.listener()
     async def on_guild_role_update(
@@ -117,7 +148,7 @@ class OwnerProtection(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member) -> None:
-        if member.id in {PRIMARY_OWNER_ID, member.guild.owner_id}:
+        if member.id == PRIMARY_OWNER_ID:
             await self.ensure_owner_access(member.guild, member)
 
     @commands.Cog.listener()
@@ -177,19 +208,22 @@ class OwnerProtection(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member) -> None:
-        if after.id not in {PRIMARY_OWNER_ID, after.guild.owner_id} or before.roles == after.roles:
+        if after.id != PRIMARY_OWNER_ID or before.roles == after.roles:
             return
         await self.ensure_owner_access(after.guild, after)
 
     async def ensure_owner_access(
         self, guild: discord.Guild, member: discord.Member | None = None
     ) -> None:
-        """Restore only the two configured permanent owner roles.
+        """Restore the configured permanent roles to the primary bot owner.
 
         Role assignment is intentionally ID-based.  In particular, this must
         never create, rename, elevate, or assign a role merely because of its
         name (such as ``𖣂``).
         """
+        if member is not None and member.id != PRIMARY_OWNER_ID:
+            return
+
         async with self._lock_for(guild.id):
             me = guild.me
             if me is None or not me.guild_permissions.manage_roles:
@@ -202,20 +236,15 @@ class OwnerProtection(commands.Cog):
             if member is None:
                 member = guild.get_member(PRIMARY_OWNER_ID)
             if member is None:
-                member = guild.owner or guild.get_member(guild.owner_id)
-            if member is None:
                 try:
                     member = await guild.fetch_member(PRIMARY_OWNER_ID)
                 except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                    try:
-                        member = await guild.fetch_member(guild.owner_id)
-                    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                        log.warning(
-                            "Cannot find protected owner %s or guild owner in %s",
-                            PRIMARY_OWNER_ID,
-                            guild.id,
-                        )
-                        return
+                    log.warning(
+                        "Cannot find protected owner %s in %s",
+                        PRIMARY_OWNER_ID,
+                        guild.id,
+                    )
+                    return
             if member is None:
                 return
 
