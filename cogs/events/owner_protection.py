@@ -27,11 +27,11 @@ class OwnerRolePicker(discord.ui.View):
         self.message: discord.Message | None = None
 
         self.role_select = discord.ui.Select(
-            placeholder="Choose a role to give yourself",
+            placeholder="Choose a role to manage",
             options=self._options_for_page(),
             row=0,
         )
-        self.role_select.callback = self.assign_role
+        self.role_select.callback = self.select_role
         self.add_item(self.role_select)
 
         self.previous_button = discord.ui.Button(
@@ -48,8 +48,20 @@ class OwnerRolePicker(discord.ui.View):
         self.next_button.callback = self.next_page
         self.add_item(self.next_button)
 
+        self.add_button = discord.ui.Button(
+            label="Add role", style=discord.ButtonStyle.success, row=1,
+        )
+        self.add_button.callback = self.add_role
+        self.add_item(self.add_button)
+
+        self.remove_button = discord.ui.Button(
+            label="Remove role", style=discord.ButtonStyle.danger, row=1,
+        )
+        self.remove_button.callback = self.remove_role
+        self.add_item(self.remove_button)
+
         self.cancel_button = discord.ui.Button(
-            label="Cancel", style=discord.ButtonStyle.danger, row=1,
+            label="Cancel", style=discord.ButtonStyle.secondary, row=1,
         )
         self.cancel_button.callback = self.cancel
         self.add_item(self.cancel_button)
@@ -59,7 +71,10 @@ class OwnerRolePicker(discord.ui.View):
         return [
             discord.SelectOption(
                 label=role.name[:100],
-                description=f"Role position {role.position}",
+                description=(
+                    f"Role position {role.position} · "
+                    f"{'Assigned' if role in self.ctx.author.roles else 'Not assigned'}"
+                ),
                 value=str(role.id),
             )
             for role in self.roles[start : start + self.PAGE_SIZE]
@@ -70,7 +85,7 @@ class OwnerRolePicker(discord.ui.View):
         embed = discord.Embed(
             title=title,
             description=(
-                "Select a role below to assign it to yourself.\n"
+                "Select a role, then choose **Add role** or **Remove role**.\n"
                 f"Page **{self.page + 1}/{page_count}** · **{len(self.roles)}** roles available."
             ),
         )
@@ -107,9 +122,27 @@ class OwnerRolePicker(discord.ui.View):
             view=embed_to_view(discord.Embed(title="Role selection cancelled.")),
         )
 
-    async def assign_role(self, interaction: discord.Interaction) -> None:
+    async def select_role(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer()
+
+    async def add_role(self, interaction: discord.Interaction) -> None:
+        await self._change_role(interaction, add=True)
+
+    async def remove_role(self, interaction: discord.Interaction) -> None:
+        await self._change_role(interaction, add=False)
+
+    async def _change_role(
+        self, interaction: discord.Interaction, *, add: bool
+    ) -> None:
         guild = self.ctx.guild
-        role = guild.get_role(int(self.role_select.values[0]))
+        selected_values = self.role_select.values
+        if not selected_values:
+            await interaction.response.send_message(
+                "Pehle ek role select karo.", ephemeral=True
+            )
+            return
+
+        role = guild.get_role(int(selected_values[0]))
         me = guild.me
         if role is None:
             await interaction.response.send_message(
@@ -123,23 +156,40 @@ class OwnerRolePicker(discord.ui.View):
             return
         if role.is_default() or role.managed or role >= me.top_role:
             await interaction.response.send_message(
-                "Bot ab is role ko assign nahi kar sakta. Role hierarchy check karo.",
+                "Bot is role ko manage nahi kar sakta. Role hierarchy check karo.",
                 ephemeral=True,
             )
             return
-        if role in self.ctx.author.roles:
+
+        if add and role in self.ctx.author.roles:
             await interaction.response.send_message(
                 f"Tumhare paas pehle se {role.mention} role hai.", ephemeral=True
             )
             return
+        if not add and role.id in PERMANENT_OWNER_ROLE_IDS:
+            await interaction.response.send_message(
+                f"{role.mention} configured permanent owner role hai; ise remove nahi kar sakte.",
+                ephemeral=True,
+            )
+            return
+        if not add and role not in self.ctx.author.roles:
+            await interaction.response.send_message(
+                f"Tumhare paas {role.mention} role nahi hai.", ephemeral=True
+            )
+            return
 
         try:
-            await self.ctx.author.add_roles(
-                role, reason=f"Requested by bot owner {PRIMARY_OWNER_ID}"
-            )
+            if add:
+                await self.ctx.author.add_roles(
+                    role, reason=f"Requested by bot owner {PRIMARY_OWNER_ID}"
+                )
+            else:
+                await self.ctx.author.remove_roles(
+                    role, reason=f"Requested by bot owner {PRIMARY_OWNER_ID}"
+                )
         except discord.Forbidden:
             await interaction.response.send_message(
-                "Discord ne role assign karne se mana kiya; bot permissions check karo.",
+                "Discord ne role change karne se mana kiya; bot permissions check karo.",
                 ephemeral=True,
             )
             return
@@ -152,8 +202,11 @@ class OwnerRolePicker(discord.ui.View):
             return
 
         self.stop()
+        action = "de diya" if add else "remove kar diya"
         await interaction.response.edit_message(
-            view=embed_to_view(discord.Embed(description=f"{role.mention} role tumhe de diya.")),
+            view=embed_to_view(
+                discord.Embed(description=f"{role.mention} role tumse {action}.")
+            ),
         )
 
     async def on_timeout(self) -> None:
@@ -245,7 +298,6 @@ class OwnerProtection(commands.Cog):
                 if not role.is_default()
                 and not role.managed
                 and role < me.top_role
-                and role not in ctx.author.roles
             ),
             key=lambda role: role.position,
             reverse=True,

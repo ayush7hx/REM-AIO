@@ -151,10 +151,28 @@ class PanelLayoutView(discord.ui.LayoutView):
             interactive = list(controls.children)
             if interactive:
                 children.append(discord.ui.Separator())
-                for index in range(0, len(interactive), 5):
-                    for item in interactive[index : index + 5]:
-                        item._view = None
-                    children.append(discord.ui.ActionRow(*interactive[index : index + 5]))
+                rows: dict[tuple[int, bool], list[discord.ui.Item]] = {}
+                select_types = (
+                    discord.ui.Select,
+                    discord.ui.UserSelect,
+                    discord.ui.RoleSelect,
+                    discord.ui.ChannelSelect,
+                    discord.ui.MentionableSelect,
+                )
+                for item in interactive:
+                    key = (item.row or 0, isinstance(item, select_types))
+                    rows.setdefault(key, []).append(item)
+
+                for (_, is_select), row_items in sorted(rows.items()):
+                    item_groups = (
+                        [[item] for item in row_items]
+                        if is_select
+                        else [row_items[index : index + 5] for index in range(0, len(row_items), 5)]
+                    )
+                    for item_group in item_groups:
+                        for item in item_group:
+                            item._view = None
+                        children.append(discord.ui.ActionRow(*item_group))
 
         self.add_item(discord.ui.Container(*children))
 
