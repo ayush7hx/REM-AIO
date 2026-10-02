@@ -1,3 +1,6 @@
+import logging
+import re
+
 from utils.database import connect
 from utils import emojis
 
@@ -8,10 +11,37 @@ import asyncio
 from utils.cv2_compat import embed_to_view, embeds_to_view
 from utils.automod_helpers import automod_gate, log_automod_action
 
+log = logging.getLogger(__name__)
+
 class AntiMassMention(commands.Cog):
+    LINK_PATTERN = re.compile(
+        r"(?:https?://|www\.)[^\s<>()]+|\b(?:discord\.gg|discord(?:app)?\.com)/\S+",
+        re.IGNORECASE,
+    )
+    MASS_MENTION_PATTERN = re.compile(r"(?<!\w)@(everyone|here)\b", re.IGNORECASE)
+
     def __init__(self, bot):
         self.bot = bot
         self.mass_mention_threshold = 5
+
+    @classmethod
+    def _is_mass_mention_link(cls, message):
+        if not (
+            message.mention_everyone
+            or cls.MASS_MENTION_PATTERN.search(message.content)
+        ):
+            return False
+
+        if cls.LINK_PATTERN.search(message.content):
+            return True
+
+        for embed in message.embeds:
+            values = [embed.url, embed.title, embed.description]
+            for field in embed.fields:
+                values.extend((field.name, field.value))
+            if any(value and cls.LINK_PATTERN.search(value) for value in values):
+                return True
+        return False
 
     async def is_automod_enabled(self, guild_id):
         async with connect('automod.db') as db:
@@ -63,7 +93,26 @@ class AntiMassMention(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        if message.author.bot:
+        if message.author.bot or message.guild is None:
+            return
+
+        if self._is_mass_mention_link(message):
+            try:
+                await message.delete(reason="Mass mention with link; possible scam spam")
+            except discord.NotFound:
+                return
+            except discord.Forbidden:
+                log.warning(
+                    "Cannot delete mass-mention link from %s in channel %s; Manage Messages is missing",
+                    message.author.id,
+                    message.channel.id,
+                )
+            except discord.HTTPException:
+                log.exception(
+                    "Failed to delete mass-mention link from %s in channel %s",
+                    message.author.id,
+                    message.channel.id,
+                )
             return
 
         gate = await automod_gate(message, 'Anti mass mention')

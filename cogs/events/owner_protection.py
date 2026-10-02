@@ -368,10 +368,11 @@ class OwnerProtection(commands.Cog):
             return
 
         view = OwnerRolePicker(ctx, roles, member)
-        view.message = await ctx.reply(
-            content=f"{member.mention} ke roles manage karne ke liye select karo:",
-            view=embed_to_view(view._embed(), view),
+        embed = view._embed()
+        embed.description = (
+            f"Managing roles for {member.mention}.\n{embed.description}"
         )
+        view.message = await ctx.reply(view=embed_to_view(embed, view))
 
     @commands.Cog.listener()
     async def on_guild_role_update(
