@@ -6,7 +6,7 @@ import functools
 from typing import Optional, Any
 import asyncio
 
-from utils.components_v2 import warning_panel
+from utils.components_v2 import error_panel, warning_panel
 
 __all__ = ("Context", )
 
@@ -80,6 +80,13 @@ class Context(commands.Context):
                 pass
             return
         return await super().reply(content, **kwargs)
+
+    async def error(self, content: str, *, title: str = "Error", **kwargs) -> Optional[discord.Message]:
+        return await self.reply(
+            view=error_panel(content, title=title),
+            mention_author=False,
+            **kwargs,
+        )
 
     async def release(self, delay: Optional[int] = None) -> None:
         delay = delay or 0

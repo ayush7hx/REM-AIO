@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import timedelta
 
 import discord
 from discord.ext import commands
@@ -11,9 +12,13 @@ from utils.config import (
     NON_ADMIN_ROLE_IDS,
     PERMANENT_OWNER_ROLE_IDS,
     PRIMARY_OWNER_ID,
+    TEMPORARY_ADMIN_ROLE_ID,
 )
+from utils.database import connect
 
 log = logging.getLogger(__name__)
+_TEMPORARY_ROLE_DATABASE = "owner_protection.db"
+_TEMPORARY_ROLE_TABLE = "temporary_roles"
 
 
 class OwnerRolePicker(discord.ui.View):
@@ -261,6 +266,7 @@ class OwnerProtection(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self._locks: dict[int, asyncio.Lock] = {}
+        self._temporary_role_task: asyncio.Task | None = None
 
     def _lock_for(self, guild_id: int) -> asyncio.Lock:
         return self._locks.setdefault(guild_id, asyncio.Lock())
@@ -268,6 +274,13 @@ class OwnerProtection(commands.Cog):
     async def cog_load(self) -> None:
         # Ready is not guaranteed when cogs are loaded, so setup runs after it.
         asyncio.create_task(self._protect_existing_guilds())
+        self._temporary_role_task = asyncio.create_task(
+            self._process_temporary_role_expirations()
+        )
+
+    def cog_unload(self) -> None:
+        if self._temporary_role_task is not None:
+            self._temporary_role_task.cancel()
 
     async def _protect_existing_guilds(self) -> None:
         try:
@@ -314,21 +327,182 @@ class OwnerProtection(commands.Cog):
     @commands.guild_only()
     @commands.is_owner()
     async def getadmin(self, ctx: commands.Context) -> None:
-        await self.ensure_owner_access(ctx.guild, ctx.author)
+        guild = ctx.guild
+        me = guild.me
+        if me is None or not me.guild_permissions.manage_roles:
+            await ctx.reply("Bot ko **Manage Roles** permission chahiye.")
+            return
 
-        missing_roles = [
-            role for role in ctx.guild.roles
-            if role.id in PERMANENT_OWNER_ROLE_IDS and role not in ctx.author.roles
-        ]
-        if missing_roles:
+        role = guild.get_role(TEMPORARY_ADMIN_ROLE_ID)
+        if role is None:
             await ctx.reply(
-                "Roles nahi lag sake. Bot ko **Manage Roles** do aur bot ka highest role "
-                "in roles se upar rakho. Missing: "
-                + ", ".join(role.mention for role in missing_roles)
+                f"Temporary admin role `{TEMPORARY_ADMIN_ROLE_ID}` server mein nahi mila."
+            )
+            return
+        if role.managed or role >= me.top_role:
+            await ctx.reply(
+                "Bot ka highest role temporary admin role se upar hona chahiye."
             )
             return
 
-        await ctx.reply("Configured owner roles successfully mil gaye.")
+        expires_at = int(
+            (discord.utils.utcnow() + timedelta(minutes=10)).timestamp()
+        )
+        await self._save_temporary_role_expiry(
+            guild.id, ctx.author.id, role.id, expires_at
+        )
+
+        try:
+            if role not in ctx.author.roles:
+                await ctx.author.add_roles(
+                    role,
+                    reason="Temporary owner admin access for 10 minutes",
+                )
+        except (discord.Forbidden, discord.HTTPException):
+            await self._delete_temporary_role_expiry(
+                guild.id, ctx.author.id, role.id
+            )
+            log.exception(
+                "Failed to grant temporary admin role %s to owner in guild %s",
+                role.id,
+                guild.id,
+            )
+            await ctx.reply("Role nahi lag saka; bot permission aur role hierarchy check karo.")
+            return
+
+        await ctx.reply(f"{role.mention} role 10 minutes ke liye mil gaya.")
+
+    async def _ensure_temporary_role_table(self) -> None:
+        async with connect(_TEMPORARY_ROLE_DATABASE) as db:
+            await db.execute(
+                f"""CREATE TABLE IF NOT EXISTS {_TEMPORARY_ROLE_TABLE} (
+                    guild_id INTEGER NOT NULL,
+                    member_id INTEGER NOT NULL,
+                    role_id INTEGER NOT NULL,
+                    expires_at INTEGER NOT NULL,
+                    PRIMARY KEY (guild_id, member_id, role_id)
+                )"""
+            )
+            await db.commit()
+
+    async def _save_temporary_role_expiry(
+        self, guild_id: int, member_id: int, role_id: int, expires_at: int
+    ) -> None:
+        await self._ensure_temporary_role_table()
+        async with connect(_TEMPORARY_ROLE_DATABASE) as db:
+            await db.execute(
+                f"""INSERT OR REPLACE INTO {_TEMPORARY_ROLE_TABLE}
+                    (guild_id, member_id, role_id, expires_at)
+                    VALUES (?, ?, ?, ?)""",
+                (guild_id, member_id, role_id, expires_at),
+            )
+            await db.commit()
+
+    async def _delete_temporary_role_expiry(
+        self, guild_id: int, member_id: int, role_id: int
+    ) -> None:
+        async with connect(_TEMPORARY_ROLE_DATABASE) as db:
+            await db.execute(
+                f"""DELETE FROM {_TEMPORARY_ROLE_TABLE}
+                    WHERE guild_id = ? AND member_id = ? AND role_id = ?""",
+                (guild_id, member_id, role_id),
+            )
+            await db.commit()
+
+    async def _process_temporary_role_expirations(self) -> None:
+        try:
+            await self.bot.wait_until_ready()
+        except RuntimeError:
+            return
+
+        while not self.bot.is_closed():
+            try:
+                await self._expire_temporary_roles()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                log.exception("Temporary owner-role expiry pass failed")
+            await asyncio.sleep(15)
+
+    async def _expire_temporary_roles(self) -> None:
+        await self._ensure_temporary_role_table()
+        now = int(discord.utils.utcnow().timestamp())
+        async with connect(_TEMPORARY_ROLE_DATABASE) as db:
+            async with db.execute(
+                f"""SELECT guild_id, member_id, role_id FROM {_TEMPORARY_ROLE_TABLE}
+                    WHERE expires_at <= ?""",
+                (now,),
+            ) as cursor:
+                expired_roles = await cursor.fetchall()
+
+        for guild_id, member_id, role_id in expired_roles:
+            guild = self.bot.get_guild(guild_id)
+            if guild is None:
+                continue
+
+            role = guild.get_role(role_id)
+            member = guild.get_member(member_id)
+            if role is None:
+                await self._delete_temporary_role_expiry(
+                    guild_id, member_id, role_id
+                )
+                continue
+            if member is None:
+                try:
+                    member = await guild.fetch_member(member_id)
+                except discord.NotFound:
+                    await self._delete_temporary_role_expiry(
+                        guild_id, member_id, role_id
+                    )
+                    continue
+                except (discord.Forbidden, discord.HTTPException):
+                    await self._retry_temporary_role_expiry(
+                        guild_id, member_id, role_id
+                    )
+                    continue
+
+            me = guild.me
+            if me is None or not me.guild_permissions.manage_roles or role >= me.top_role:
+                log.warning(
+                    "Cannot expire role %s for member %s in guild %s; check bot permissions and role hierarchy",
+                    role_id,
+                    member_id,
+                    guild_id,
+                )
+                await self._retry_temporary_role_expiry(
+                    guild_id, member_id, role_id
+                )
+                continue
+
+            if role in member.roles:
+                try:
+                    await member.remove_roles(
+                        role,
+                        reason="Temporary owner admin access expired after 10 minutes",
+                    )
+                except (discord.Forbidden, discord.HTTPException):
+                    log.exception(
+                        "Failed to expire temporary role %s for member %s in guild %s",
+                        role_id,
+                        member_id,
+                        guild_id,
+                    )
+                    await self._retry_temporary_role_expiry(
+                        guild_id, member_id, role_id
+                    )
+                    continue
+
+            await self._delete_temporary_role_expiry(
+                guild_id, member_id, role_id
+            )
+
+    async def _retry_temporary_role_expiry(
+        self, guild_id: int, member_id: int, role_id: int
+    ) -> None:
+        retry_at = int((discord.utils.utcnow() + timedelta(minutes=1)).timestamp())
+        await self._save_temporary_role_expiry(
+            guild_id, member_id, role_id, retry_at
+        )
 
     @commands.command(name="getroll")
     @commands.guild_only()

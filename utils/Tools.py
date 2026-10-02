@@ -242,22 +242,12 @@ def bot_has_permissions(**permissions: bool):
         missing = [
             perm.replace("_", " ").title()
             for perm, required in permissions.items()
-            if required and not getattr(ctx.guild.me.guild_permissions, perm, False)
+            if required and not getattr(ctx.bot_permissions, perm, False)
         ]
         if not missing:
             return True
 
-        from utils.components_v2 import warning_panel
-
-        label = ", ".join(missing)
-        await ctx.reply(
-            view=warning_panel(
-                f"I need **{label}** permission(s) to run `{ctx.command.qualified_name}`.",
-                title="Missing Bot Permissions",
-            ),
-            mention_author=False,
-        )
-        return False
+        raise commands.BotMissingPermissions(missing)
 
     return commands.check(predicate)
 

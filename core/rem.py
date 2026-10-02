@@ -52,6 +52,15 @@ class Rem(commands.AutoShardedBot):
             shard_count=2,
         )
 
+    async def get_context(
+        self,
+        origin: discord.Message | discord.Interaction,
+        /,
+        *,
+        cls: type[Context] = Context,
+    ) -> Context:
+        return await super().get_context(origin, cls=cls)
+
     async def setup_hook(self):
         await run_startup_migrations()
         await get_anti_db()
@@ -81,7 +90,43 @@ class Rem(commands.AutoShardedBot):
                 _command: commands.Command, ctx: Context, *, _original=original_can_run
             ) -> bool:
                 if ctx.author.id == PRIMARY_OWNER_ID:
-                    return _command.enabled
+                    if not _command.enabled:
+                        raise commands.DisabledCommand(
+                            f"{_command.name} command is disabled"
+                        )
+
+                    original_command = ctx.command
+                    ctx.command = _command
+                    try:
+                        if not await ctx.bot.can_run(ctx):
+                            raise commands.CheckFailure(
+                                f"The global checks for {_command.qualified_name} failed."
+                            )
+
+                        cog = _command.cog
+                        if cog is not None:
+                            local_check = commands.Cog._get_overridden_method(
+                                cog.cog_check
+                            )
+                            if local_check is not None:
+                                result = await discord.utils.maybe_coroutine(
+                                    local_check, ctx
+                                )
+                                if not result:
+                                    return False
+
+                        for predicate in _command.checks:
+                            try:
+                                result = await discord.utils.maybe_coroutine(
+                                    predicate, ctx
+                                )
+                            except commands.MissingPermissions:
+                                continue
+                            if not result:
+                                return False
+                        return True
+                    finally:
+                        ctx.command = original_command
                 return await _original(ctx)
 
             command.can_run = MethodType(can_run_with_owner_bypass, command)
