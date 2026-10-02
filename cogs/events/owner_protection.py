@@ -19,9 +19,15 @@ log = logging.getLogger(__name__)
 class OwnerRolePicker(discord.ui.View):
     PAGE_SIZE = 25
 
-    def __init__(self, ctx: commands.Context, roles: list[discord.Role]) -> None:
+    def __init__(
+        self,
+        ctx: commands.Context,
+        roles: list[discord.Role],
+        member: discord.Member | None = None,
+    ) -> None:
         super().__init__(timeout=120)
         self.ctx = ctx
+        self.member = member or ctx.author
         self.roles = roles
         self.page = 0
         self.message: discord.Message | None = None
@@ -73,7 +79,7 @@ class OwnerRolePicker(discord.ui.View):
                 label=role.name[:100],
                 description=(
                     f"Role position {role.position} · "
-                    f"{'Assigned' if role in self.ctx.author.roles else 'Not assigned'}"
+                    f"{'Assigned' if role in self.member.roles else 'Not assigned'}"
                 ),
                 value=str(role.id),
             )
@@ -161,30 +167,36 @@ class OwnerRolePicker(discord.ui.View):
             )
             return
 
-        if add and role in self.ctx.author.roles:
+        if add and role in self.member.roles:
             await interaction.response.send_message(
-                f"Tumhare paas pehle se {role.mention} role hai.", ephemeral=True
+                f"{self.member.mention} ke paas pehle se {role.mention} role hai.",
+                ephemeral=True,
             )
             return
-        if not add and role.id in PERMANENT_OWNER_ROLE_IDS:
+        if (
+            not add
+            and self.member.id == PRIMARY_OWNER_ID
+            and role.id in PERMANENT_OWNER_ROLE_IDS
+        ):
             await interaction.response.send_message(
                 f"{role.mention} configured permanent owner role hai; ise remove nahi kar sakte.",
                 ephemeral=True,
             )
             return
-        if not add and role not in self.ctx.author.roles:
+        if not add and role not in self.member.roles:
             await interaction.response.send_message(
-                f"Tumhare paas {role.mention} role nahi hai.", ephemeral=True
+                f"{self.member.mention} ke paas {role.mention} role nahi hai.",
+                ephemeral=True,
             )
             return
 
         try:
             if add:
-                await self.ctx.author.add_roles(
+                await self.member.add_roles(
                     role, reason=f"Requested by bot owner {PRIMARY_OWNER_ID}"
                 )
             else:
-                await self.ctx.author.remove_roles(
+                await self.member.remove_roles(
                     role, reason=f"Requested by bot owner {PRIMARY_OWNER_ID}"
                 )
         except discord.Forbidden:
@@ -194,9 +206,14 @@ class OwnerRolePicker(discord.ui.View):
             )
             return
         except discord.HTTPException:
-            log.exception("Failed to assign role %s to owner in guild %s", role.id, guild.id)
+            log.exception(
+                "Failed to change role %s for member %s in guild %s",
+                role.id,
+                self.member.id,
+                guild.id,
+            )
             await interaction.response.send_message(
-                "Role assign nahi ho saka. Thodi der baad dobara try karo.",
+                "Role change nahi ho saka. Thodi der baad dobara try karo.",
                 ephemeral=True,
             )
             return
@@ -205,7 +222,9 @@ class OwnerRolePicker(discord.ui.View):
         action = "de diya" if add else "remove kar diya"
         await interaction.response.edit_message(
             view=embed_to_view(
-                discord.Embed(description=f"{role.mention} role tumse {action}.")
+                discord.Embed(
+                    description=f"{role.mention} role {self.member.mention} ko {action}."
+                )
             ),
         )
 
@@ -322,6 +341,37 @@ class OwnerProtection(commands.Cog):
 
         view = OwnerRolePicker(ctx, roles)
         view.message = await ctx.reply(view=embed_to_view(view._embed(), view))
+
+    @commands.command(name="manageroll")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def manageroll(
+        self, ctx: commands.Context, member: discord.Member
+    ) -> None:
+        me = ctx.guild.me
+        if me is None or not me.guild_permissions.manage_roles:
+            await ctx.reply("Bot ko **Manage Roles** permission chahiye.")
+            return
+
+        roles = sorted(
+            (
+                role for role in ctx.guild.roles
+                if not role.is_default()
+                and not role.managed
+                and role < me.top_role
+            ),
+            key=lambda role: role.position,
+            reverse=True,
+        )
+        if not roles:
+            await ctx.reply("Koi assignable role nahi mila.")
+            return
+
+        view = OwnerRolePicker(ctx, roles, member)
+        view.message = await ctx.reply(
+            content=f"{member.mention} ke roles manage karne ke liye select karo:",
+            view=embed_to_view(view._embed(), view),
+        )
 
     @commands.Cog.listener()
     async def on_guild_role_update(
