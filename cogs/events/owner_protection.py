@@ -35,6 +35,8 @@ class OwnerRolePicker(discord.ui.View):
         self.role_select = discord.ui.Select(
             placeholder="Choose a role to manage",
             options=self._options_for_page(),
+            min_values=1,
+            max_values=min(len(roles), self.PAGE_SIZE),
             row=0,
         )
         self.role_select.callback = self.select_role
@@ -107,7 +109,9 @@ class OwnerRolePicker(discord.ui.View):
         return False
 
     async def _show_page(self, interaction: discord.Interaction) -> None:
+        self.role_select._values = []
         self.role_select.options = self._options_for_page()
+        self.role_select.max_values = len(self.role_select.options)
         self.previous_button.disabled = self.page == 0
         self.next_button.disabled = (self.page + 1) * self.PAGE_SIZE >= len(self.roles)
         await interaction.response.edit_message(
@@ -144,48 +148,53 @@ class OwnerRolePicker(discord.ui.View):
         selected_values = self.role_select.values
         if not selected_values:
             await interaction.response.send_message(
-                "Pehle ek role select karo.", ephemeral=True
+                "Pehle kam se kam ek role select karo.", ephemeral=True
             )
             return
 
-        role = guild.get_role(int(selected_values[0]))
-        me = guild.me
-        if role is None:
+        roles = [guild.get_role(int(value)) for value in selected_values]
+        if any(role is None for role in roles):
             await interaction.response.send_message(
-                "Ye role ab server mein available nahi hai.", ephemeral=True
+                "Selected roles mein se koi role ab server mein available nahi hai.",
+                ephemeral=True,
             )
             return
+
+        roles = [role for role in roles if role is not None]
+        me = guild.me
         if me is None or not me.guild_permissions.manage_roles:
             await interaction.response.send_message(
                 "Bot ko **Manage Roles** permission chahiye.", ephemeral=True
             )
             return
-        if role.is_default() or role.managed or role >= me.top_role:
+        if any(
+            role.is_default() or role.managed or role >= me.top_role
+            for role in roles
+        ):
             await interaction.response.send_message(
-                "Bot is role ko manage nahi kar sakta. Role hierarchy check karo.",
+                "Selected roles mein se koi role bot manage nahi kar sakta. Role hierarchy check karo.",
                 ephemeral=True,
             )
             return
 
-        if add and role in self.member.roles:
-            await interaction.response.send_message(
-                f"{self.member.mention} ke paas pehle se {role.mention} role hai.",
-                ephemeral=True,
-            )
-            return
         if (
             not add
             and self.member.id == PRIMARY_OWNER_ID
-            and role.id in PERMANENT_OWNER_ROLE_IDS
+            and any(role.id in PERMANENT_OWNER_ROLE_IDS for role in roles)
         ):
             await interaction.response.send_message(
-                f"{role.mention} configured permanent owner role hai; ise remove nahi kar sakte.",
+                "Configured permanent owner role ko remove nahi kar sakte.",
                 ephemeral=True,
             )
             return
-        if not add and role not in self.member.roles:
+
+        if add:
+            changed_roles = [role for role in roles if role not in self.member.roles]
+        else:
+            changed_roles = [role for role in roles if role in self.member.roles]
+        if not changed_roles:
             await interaction.response.send_message(
-                f"{self.member.mention} ke paas {role.mention} role nahi hai.",
+                f"Selected roles mein koi bhi {'add' if add else 'remove'} karne ke liye available nahi hai.",
                 ephemeral=True,
             )
             return
@@ -193,11 +202,13 @@ class OwnerRolePicker(discord.ui.View):
         try:
             if add:
                 await self.member.add_roles(
-                    role, reason=f"Requested by bot owner {PRIMARY_OWNER_ID}"
+                    *changed_roles,
+                    reason=f"Requested by bot owner {PRIMARY_OWNER_ID}",
                 )
             else:
                 await self.member.remove_roles(
-                    role, reason=f"Requested by bot owner {PRIMARY_OWNER_ID}"
+                    *changed_roles,
+                    reason=f"Requested by bot owner {PRIMARY_OWNER_ID}",
                 )
         except discord.Forbidden:
             await interaction.response.send_message(
@@ -208,7 +219,7 @@ class OwnerRolePicker(discord.ui.View):
         except discord.HTTPException:
             log.exception(
                 "Failed to change role %s for member %s in guild %s",
-                role.id,
+                ", ".join(str(role.id) for role in changed_roles),
                 self.member.id,
                 guild.id,
             )
@@ -220,10 +231,13 @@ class OwnerRolePicker(discord.ui.View):
 
         self.stop()
         action = "de diya" if add else "remove kar diya"
+        role_mentions = ", ".join(role.mention for role in changed_roles)
         await interaction.response.edit_message(
             view=embed_to_view(
                 discord.Embed(
-                    description=f"{role.mention} role {self.member.mention} ko {action}."
+                    description=(
+                        f"{role_mentions} role(s) {self.member.mention} ko {action}."
+                    )
                 )
             ),
         )
