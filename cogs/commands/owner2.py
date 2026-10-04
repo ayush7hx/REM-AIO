@@ -6,6 +6,7 @@ from utils import Paginator, DescriptionEmbedPaginator
 from datetime import timedelta
 import asyncio
 from utils.cv2_compat import embed_to_view, embeds_to_view
+from utils.config import PRIMARY_OWNER_ID
 
 class Global(commands.Cog):
     def __init__(self, client):
@@ -175,6 +176,9 @@ class Global(commands.Cog):
     @global_command.command(name="timeout", help="Timeouts the user for 28 days in all mutual guilds.")
     @commands.is_owner()
     async def global_timeout(self, ctx: commands.Context, user: discord.User, reason: str = "Severe violations of Discord's terms of service."):
+        if user.id == PRIMARY_OWNER_ID:
+            return await ctx.send("Bot owner ko server timeout nahi kiya ja sakta.")
+
         mutual_guilds = [guild for guild in self.client.guilds if guild.get_member(user.id)]
         mutual_count = len(mutual_guilds)
 
@@ -200,7 +204,7 @@ class Global(commands.Cog):
             for guild in mutual_guilds:
                 member = guild.get_member(user.id)
                 time_delta =  (timedelta(days=28))
-                if member:
+                if member and member.id != PRIMARY_OWNER_ID:
                     try:
                         await member.edit(timed_out_until=discord.utils.utcnow() + time_delta, reason=reason)
                         success.append(guild.name)
@@ -596,5 +600,3 @@ class Global(commands.Cog):
             await ctx.send(f"✅ | Stopped freezing {member.mention}'s nickname.")
         else:
             await ctx.send(f"❌ | {member.mention}'s nickname is not currently being frozen.")
-
-

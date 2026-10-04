@@ -4,6 +4,7 @@ from datetime import datetime
 
 from utils.database import open_connection
 from utils.cv2_compat import embed_to_view, embeds_to_view
+from utils.sensitive_commands import is_sensitive_owner_command
 
 DB_FILE = "logging.db"
 
@@ -104,6 +105,9 @@ class Logging(commands.Cog):
     @commands.Cog.listener()
     async def on_message_delete(self, message):
         if message.guild and not message.author.bot:
+            if await is_sensitive_owner_command(self.bot, message):
+                return
+
             embed = discord.Embed(title="🗑️ Message Deleted", color=discord.Color.red())
             embed.add_field(name="User", value=message.author.mention)
             embed.add_field(name="Channel", value=message.channel.mention)

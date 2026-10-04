@@ -7,6 +7,7 @@ from datetime import timedelta
 import re
 from utils.Tools import *
 from utils.cv2_compat import embed_to_view, embeds_to_view, sync_panel_message
+from utils.config import PRIMARY_OWNER_ID
 
 class TimeoutView(ui.View):
     def __init__(self, user, author):
@@ -130,6 +131,9 @@ class Mute(commands.Cog):
     @commands.has_permissions(moderate_members=True)
     @bot_has_permissions(moderate_members=True)
     async def mute(self, ctx, user: discord.Member, time: str = None, *, reason=None):
+
+        if user.id == PRIMARY_OWNER_ID:
+            return await ctx.send("Bot owner ko server mute/timeout nahi kiya ja sakta.")
 
         if user.is_timed_out():
             embed = discord.Embed(description="**Requested User is already muted in this server.**", color=self.color)

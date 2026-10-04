@@ -20,6 +20,7 @@ from flask import Flask
 from core.rem import Rem
 from utils.config import COMMAND_LOG_IGNORE_IDS, COMMAND_LOG_WEBHOOK_URL, ENABLE_KEEP_ALIVE, LOG_LEVEL, NAME, PORT, PREFIX, TOKEN
 from utils import console
+from utils.sensitive_commands import is_sensitive_owner_command
 from utils.startup import StartupError, validate_startup_config
 
 console.setup_console_logging(LOG_LEVEL)
@@ -87,6 +88,9 @@ async def on_ready():
 
 @client.event
 async def on_command_completion(context: commands.Context) -> None:
+    if await is_sensitive_owner_command(client, context.message):
+        return
+
     if not COMMAND_LOG_WEBHOOK_URL or context.author.id in COMMAND_LOG_IGNORE_IDS:
         return
 

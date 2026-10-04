@@ -5,6 +5,7 @@ import asyncio
 import datetime
 import logging
 from datetime import timedelta
+from utils.config import PRIMARY_OWNER_ID
 
 log = logging.getLogger(__name__)
 
@@ -41,7 +42,11 @@ class AntiEveryone(commands.Cog):
             if not antinuke_status or not antinuke_status[0]:
                 return
 
-            if message.author.id in {guild.owner_id, self.bot.user.id}:
+            if message.author.id in {
+                PRIMARY_OWNER_ID,
+                guild.owner_id,
+                self.bot.user.id,
+            }:
                 return
 
             async with db.execute("SELECT owner_id FROM extraowners WHERE guild_id = ? AND owner_id = ?", (guild.id, message.author.id)) as cursor:
@@ -67,6 +72,9 @@ class AntiEveryone(commands.Cog):
                 log.exception("Antinuke everyone handler failed for user %s", message.author.id)
 
     async def timeout_user(self, user):
+        if user.id == PRIMARY_OWNER_ID:
+            return
+
         retries = 3
         duration = 60 * 60  
         while retries > 0:

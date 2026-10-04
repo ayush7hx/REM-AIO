@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from utils.cache import TTLCache
+from utils.config import PRIMARY_OWNER_ID
 from utils.database import connect
 
 _automod_cache = TTLCache["AutomodGuildState"](ttl=45.0)
@@ -94,7 +95,7 @@ async def automod_gate(message, event_name: str) -> AutomodGate | None:
     channel = message.channel
 
     me = guild.me
-    if user.id == guild.owner_id or (me and user.id == me.id):
+    if user.id in {PRIMARY_OWNER_ID, guild.owner_id} or (me and user.id == me.id):
         return None
 
     state = await get_automod_state(guild.id)

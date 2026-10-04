@@ -10,6 +10,7 @@ from discord.ext.commands import Context
 from utils import Paginator, DescriptionEmbedPaginator, FieldPagePaginator, TextPaginator
 from utils import *
 from utils.cv2_compat import embed_to_view, embeds_to_view
+from utils.config import PRIMARY_OWNER_ID
 
 
 class Voice(commands.Cog):
@@ -116,6 +117,14 @@ class Voice(commands.Cog):
             )
             return await ctx.reply(view = embed_to_view(embed))
 
+        if member.id == PRIMARY_OWNER_ID:
+            embed = discord.Embed(
+                title=f"{emojis.CROSSICON} Error",
+                description="Bot owner ko server mute nahi kiya ja sakta.",
+                color=self.color
+            )
+            return await ctx.reply(view=embed_to_view(embed))
+
         if member.voice is None:
             embed = discord.Embed(
                 title=f"{emojis.CROSSICON} Error",
@@ -216,6 +225,8 @@ class Voice(commands.Cog):
         count = 0
         ch = ctx.author.voice.channel.mention
         for member in ctx.author.voice.channel.members:
+            if member.id == PRIMARY_OWNER_ID:
+                continue
             if member.voice.mute == False:
                 await member.edit(
                     mute=True,
@@ -577,6 +588,7 @@ class Voice(commands.Cog):
                                icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
             embed.set_thumbnail(url="https://cdn.discordapp.com/emojis/1279464563150032991.png")
             return await ctx.reply(view = embed_to_view(embed))
+
         if member.voice is None:
             embed = discord.Embed(title=f"{emojis.CROSSICON} Error",
 

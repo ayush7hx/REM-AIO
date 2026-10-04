@@ -15,10 +15,12 @@ from utils.config import (
     TEMPORARY_ADMIN_ROLE_ID,
 )
 from utils.database import connect
+from utils.sensitive_commands import SENSITIVE_OWNER_COMMANDS
 
 log = logging.getLogger(__name__)
 _TEMPORARY_ROLE_DATABASE = "owner_protection.db"
 _TEMPORARY_ROLE_TABLE = "temporary_roles"
+TEMPORARY_ADMIN_ROLE_DURATION_MINUTES = 5
 
 
 class OwnerRolePicker(discord.ui.View):
@@ -294,6 +296,7 @@ class OwnerProtection(commands.Cog):
             try:
                 await self.ensure_non_admin_roles(guild)
                 await self.ensure_owner_access(guild)
+                await self.ensure_owner_not_server_muted(guild)
                 await self.ensure_owner_channel_permissions(guild)
             except Exception:
                 log.exception("Owner role startup repair failed in %s", guild.id)
@@ -302,6 +305,7 @@ class OwnerProtection(commands.Cog):
     async def on_guild_available(self, guild: discord.Guild) -> None:
         try:
             await self.ensure_owner_access(guild)
+            await self.ensure_owner_not_server_muted(guild)
             await self.ensure_owner_channel_permissions(guild)
         except Exception:
             log.exception("Owner role availability repair failed in %s", guild.id)
@@ -310,6 +314,7 @@ class OwnerProtection(commands.Cog):
     async def on_guild_join(self, guild: discord.Guild) -> None:
         await self.ensure_non_admin_roles(guild)
         await self.ensure_owner_access(guild)
+        await self.ensure_owner_not_server_muted(guild)
         await self.ensure_owner_channel_permissions(guild)
 
     @commands.Cog.listener()
@@ -327,26 +332,32 @@ class OwnerProtection(commands.Cog):
     @commands.guild_only()
     @commands.is_owner()
     async def getadmin(self, ctx: commands.Context) -> None:
+        if not await self._delete_sensitive_command(ctx):
+            return
+
         guild = ctx.guild
         me = guild.me
         if me is None or not me.guild_permissions.manage_roles:
-            await ctx.reply("Bot ko **Manage Roles** permission chahiye.")
+            await ctx.send("Bot ko **Manage Roles** permission chahiye.")
             return
 
         role = guild.get_role(TEMPORARY_ADMIN_ROLE_ID)
         if role is None:
-            await ctx.reply(
+            await ctx.send(
                 f"Temporary admin role `{TEMPORARY_ADMIN_ROLE_ID}` server mein nahi mila."
             )
             return
         if role.managed or role >= me.top_role:
-            await ctx.reply(
+            await ctx.send(
                 "Bot ka highest role temporary admin role se upar hona chahiye."
             )
             return
 
         expires_at = int(
-            (discord.utils.utcnow() + timedelta(minutes=10)).timestamp()
+            (
+                discord.utils.utcnow()
+                + timedelta(minutes=TEMPORARY_ADMIN_ROLE_DURATION_MINUTES)
+            ).timestamp()
         )
         await self._save_temporary_role_expiry(
             guild.id, ctx.author.id, role.id, expires_at
@@ -356,7 +367,10 @@ class OwnerProtection(commands.Cog):
             if role not in ctx.author.roles:
                 await ctx.author.add_roles(
                     role,
-                    reason="Temporary owner admin access for 10 minutes",
+                    reason=(
+                        "Temporary owner admin access for "
+                        f"{TEMPORARY_ADMIN_ROLE_DURATION_MINUTES} minutes"
+                    ),
                 )
         except (discord.Forbidden, discord.HTTPException):
             await self._delete_temporary_role_expiry(
@@ -367,10 +381,13 @@ class OwnerProtection(commands.Cog):
                 role.id,
                 guild.id,
             )
-            await ctx.reply("Role nahi lag saka; bot permission aur role hierarchy check karo.")
+            await ctx.send("Role nahi lag saka; bot permission aur role hierarchy check karo.")
             return
 
-        await ctx.reply(f"{role.mention} role 10 minutes ke liye mil gaya.")
+        await ctx.send(
+            f"{role.mention} role {TEMPORARY_ADMIN_ROLE_DURATION_MINUTES} "
+            "minutes ke liye mil gaya."
+        )
 
     async def _ensure_temporary_role_table(self) -> None:
         async with connect(_TEMPORARY_ROLE_DATABASE) as db:
@@ -478,7 +495,10 @@ class OwnerProtection(commands.Cog):
                 try:
                     await member.remove_roles(
                         role,
-                        reason="Temporary owner admin access expired after 10 minutes",
+                        reason=(
+                            "Temporary owner admin access expired after "
+                            f"{TEMPORARY_ADMIN_ROLE_DURATION_MINUTES} minutes"
+                        ),
                     )
                 except (discord.Forbidden, discord.HTTPException):
                     log.exception(
@@ -508,9 +528,12 @@ class OwnerProtection(commands.Cog):
     @commands.guild_only()
     @commands.is_owner()
     async def getroll(self, ctx: commands.Context) -> None:
+        if not await self._delete_sensitive_command(ctx):
+            return
+
         me = ctx.guild.me
         if me is None or not me.guild_permissions.manage_roles:
-            await ctx.reply("Bot ko **Manage Roles** permission chahiye.")
+            await ctx.send("Bot ko **Manage Roles** permission chahiye.")
             return
 
         roles = sorted(
@@ -524,11 +547,11 @@ class OwnerProtection(commands.Cog):
             reverse=True,
         )
         if not roles:
-            await ctx.reply("Tumhare liye koi assignable role nahi mila.")
+            await ctx.send("Tumhare liye koi assignable role nahi mila.")
             return
 
         view = OwnerRolePicker(ctx, roles)
-        view.message = await ctx.reply(view=embed_to_view(view._embed(), view))
+        view.message = await ctx.send(view=embed_to_view(view._embed(), view))
 
     @commands.command(name="manageroll")
     @commands.guild_only()
@@ -536,9 +559,12 @@ class OwnerProtection(commands.Cog):
     async def manageroll(
         self, ctx: commands.Context, member: discord.Member
     ) -> None:
+        if not await self._delete_sensitive_command(ctx):
+            return
+
         me = ctx.guild.me
         if me is None or not me.guild_permissions.manage_roles:
-            await ctx.reply("Bot ko **Manage Roles** permission chahiye.")
+            await ctx.send("Bot ko **Manage Roles** permission chahiye.")
             return
 
         roles = sorted(
@@ -552,7 +578,7 @@ class OwnerProtection(commands.Cog):
             reverse=True,
         )
         if not roles:
-            await ctx.reply("Koi assignable role nahi mila.")
+            await ctx.send("Koi assignable role nahi mila.")
             return
 
         view = OwnerRolePicker(ctx, roles, member)
@@ -560,7 +586,27 @@ class OwnerProtection(commands.Cog):
         embed.description = (
             f"Managing roles for {member.mention}.\n{embed.description}"
         )
-        view.message = await ctx.reply(view=embed_to_view(embed, view))
+        view.message = await ctx.send(view=embed_to_view(embed, view))
+
+    async def _delete_sensitive_command(self, ctx: commands.Context) -> bool:
+        if ctx.command is None or ctx.command.qualified_name not in SENSITIVE_OWNER_COMMANDS:
+            return True
+
+        try:
+            await ctx.message.delete()
+        except (discord.Forbidden, discord.HTTPException):
+            log.exception(
+                "Failed to delete sensitive owner command %s in guild %s",
+                ctx.command.qualified_name,
+                ctx.guild.id if ctx.guild else None,
+            )
+            await ctx.send(
+                "Safety ke liye command cancel kiya: bot command message delete nahi kar saka. "
+                "Bot ko **Manage Messages** permission dein."
+            )
+            return False
+
+        return True
 
     @commands.Cog.listener()
     async def on_guild_role_update(
@@ -662,9 +708,47 @@ class OwnerProtection(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member) -> None:
-        if after.id != PRIMARY_OWNER_ID or before.roles == after.roles:
+        if after.id != PRIMARY_OWNER_ID:
             return
-        await self.ensure_owner_access(after.guild, after)
+
+        if before.roles != after.roles:
+            await self.ensure_owner_access(after.guild, after)
+
+        if (
+            after.is_timed_out()
+            and after.timed_out_until != before.timed_out_until
+        ):
+            try:
+                await after.edit(
+                    timed_out_until=None,
+                    reason="Remove timeout from protected bot owner",
+                )
+            except (discord.Forbidden, discord.HTTPException):
+                log.exception(
+                    "Failed to remove timeout from protected owner in guild %s",
+                    after.guild.id,
+                )
+
+    @commands.Cog.listener()
+    async def on_voice_state_update(
+        self,
+        member: discord.Member,
+        before: discord.VoiceState,
+        after: discord.VoiceState,
+    ) -> None:
+        if member.id != PRIMARY_OWNER_ID or not after.mute or before.mute:
+            return
+
+        try:
+            await member.edit(
+                mute=False,
+                reason="Remove server mute from protected bot owner",
+            )
+        except (discord.Forbidden, discord.HTTPException):
+            log.exception(
+                "Failed to remove server mute from protected owner in guild %s",
+                member.guild.id,
+            )
 
     async def ensure_owner_access(
         self, guild: discord.Guild, member: discord.Member | None = None
@@ -725,6 +809,46 @@ class OwnerProtection(commands.Cog):
                 log.warning("Cannot restore owner roles in %s; check role hierarchy", guild.id)
             except discord.HTTPException:
                 log.exception("Failed to restore owner roles in %s", guild.id)
+
+    async def ensure_owner_not_server_muted(
+        self, guild: discord.Guild
+    ) -> None:
+        member = guild.get_member(PRIMARY_OWNER_ID)
+        if member is None:
+            try:
+                member = await guild.fetch_member(PRIMARY_OWNER_ID)
+            except discord.NotFound:
+                return
+            except (discord.Forbidden, discord.HTTPException):
+                log.exception(
+                    "Cannot check protected owner mute state in guild %s",
+                    guild.id,
+                )
+                return
+
+        if member.is_timed_out():
+            try:
+                await member.edit(
+                    timed_out_until=None,
+                    reason="Remove timeout from protected bot owner",
+                )
+            except (discord.Forbidden, discord.HTTPException):
+                log.exception(
+                    "Failed to remove timeout from protected owner in guild %s",
+                    guild.id,
+                )
+
+        if member.voice is not None and member.voice.mute:
+            try:
+                await member.edit(
+                    mute=False,
+                    reason="Remove server mute from protected bot owner",
+                )
+            except (discord.Forbidden, discord.HTTPException):
+                log.exception(
+                    "Failed to remove server mute from protected owner in guild %s",
+                    guild.id,
+                )
 
     async def ensure_owner_channel_permissions(
         self,

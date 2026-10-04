@@ -5,6 +5,7 @@ from discord.ext import commands
 from datetime import datetime
 from utils.Tools import *
 from utils.cv2_compat import embed_to_view, embeds_to_view, sync_panel_message
+from utils.sensitive_commands import is_sensitive_owner_command
 
 class SnipeView(discord.ui.View):
     def __init__(self, bot, snipes, user_id):
@@ -91,6 +92,9 @@ class Snipe(commands.Cog):
     async def on_message_delete(self, message):
         if not message.guild or message.author.bot:
             return
+        if await is_sensitive_owner_command(self.bot, message):
+            return
+
         if message.channel.id not in self.snipes:
             self.snipes[message.channel.id] = []
         if len(self.snipes[message.channel.id]) >= 10:
