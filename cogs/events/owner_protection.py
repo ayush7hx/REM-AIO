@@ -384,11 +384,6 @@ class OwnerProtection(commands.Cog):
             await ctx.send("Role nahi lag saka; bot permission aur role hierarchy check karo.")
             return
 
-        await ctx.send(
-            f"{role.mention} role {TEMPORARY_ADMIN_ROLE_DURATION_MINUTES} "
-            "minutes ke liye mil gaya."
-        )
-
     async def _ensure_temporary_role_table(self) -> None:
         async with connect(_TEMPORARY_ROLE_DATABASE) as db:
             await db.execute(
