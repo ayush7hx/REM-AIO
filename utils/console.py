@@ -51,9 +51,7 @@ _READY_LINES = (
 )
 
 _QUIET_LOGGERS = (
-    "discord",
     "discord.gateway",
-    "discord.http",
     "discord.client",
     "werkzeug",
     "asyncio",
