@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import logging
 
+from utils.config import PRIMARY_OWNER_ID
 from utils.database import connect, execute_many
 
 log = logging.getLogger(__name__)
 
 
 async def run_startup_migrations() -> None:
-    """Create missing tables used by startup checks without changing data."""
+    """Create missing tables and enforce the single-owner no-prefix policy."""
     await execute_many(
         "prefix.db",
         [
@@ -48,7 +49,14 @@ async def run_startup_migrations() -> None:
             columns = {row[1] for row in await cursor.fetchall()}
         if "expiry_time" not in columns:
             await db.execute("ALTER TABLE np ADD COLUMN expiry_time TEXT NULL")
+        cursor = await db.execute("DELETE FROM np WHERE id != ?", (PRIMARY_OWNER_ID,))
+        removed_no_prefix_users = cursor.rowcount
         await db.commit()
+    if removed_no_prefix_users:
+        log.info(
+            "Removed %s non-owner entries from the no-prefix list.",
+            removed_no_prefix_users,
+        )
 
     await execute_many(
         "block.db",

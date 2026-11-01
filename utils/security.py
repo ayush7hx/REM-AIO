@@ -89,7 +89,6 @@ class SecurityGate:
 
     def __init__(self) -> None:
         self._prefix_cache = TTLCache[str](ttl=120.0)
-        self._np_cache = TTLCache[bool](ttl=300.0)
         self._blacklist_cache = TTLCache[AccessDecision](ttl=45.0)
         self._ignore_cache = TTLCache[dict[str, set[str]]](ttl=30.0)
         self._topcheck_cache = TTLCache[bool](ttl=60.0)
@@ -129,25 +128,7 @@ class SecurityGate:
         await self._prefix_cache.invalidate(f"prefix:{guild_id}")
 
     async def has_no_prefix(self, user_id: int) -> bool:
-        # The configured protected owners always have no-prefix access,
-        # independently of the database-managed no-prefix list.
-        if user_id in OWNER_IDS:
-            return True
-
-        key = f"np:{user_id}"
-        cached = await self._np_cache.get(key)
-        if cached is not None:
-            return cached
-
-        async with connect("np.db") as db:
-            async with db.execute("SELECT 1 FROM np WHERE id = ?", (user_id,)) as cursor:
-                enabled = await cursor.fetchone() is not None
-
-        await self._np_cache.set(key, enabled)
-        return enabled
-
-    async def invalidate_no_prefix(self, user_id: int) -> None:
-        await self._np_cache.invalidate(f"np:{user_id}")
+        return user_id in OWNER_IDS
 
     async def check_blacklist(self, user_id: int, guild_id: int | None) -> AccessDecision:
         key = f"block:{user_id}:{guild_id or 0}"

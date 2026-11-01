@@ -49,6 +49,11 @@ class TimeSelect(Select):
     async def callback(self, interaction: discord.Interaction):
         if interaction.user != self.author:
             return await interaction.response.send_message("You can't select this option.", ephemeral=True)
+        if self.user.id not in OWNER_IDS:
+            return await interaction.response.send_message(
+                "No-prefix access is restricted to the configured bot owner.",
+                ephemeral=True,
+            )
 
         
         duration_mapping = {
@@ -270,6 +275,13 @@ class NoPrefix(commands.Cog):
     @_np.command(name="add", help="Add user to no-prefix with time options")
     @commands.check(is_owner_or_staff)
     async def np_add(self, ctx, user: discord.User):
+        if user.id not in OWNER_IDS:
+            await ctx.reply(
+                "No-prefix access is restricted to the configured bot owner.",
+                mention_author=False,
+            )
+            return
+
         async with connect(self.db_path) as db:
             async with db.execute("SELECT id FROM np WHERE id = ?", (user.id,)) as cursor:
                 result = await cursor.fetchone()
@@ -439,6 +451,9 @@ class NoPrefix(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_update(self, before, after):
+        if after.id not in OWNER_IDS:
+            return
+
         if before.premium_since is None and after.premium_since is not None:
             async with connect(self.db_path) as db:
                 async with db.execute("SELECT 1 FROM autonp WHERE guild_id = ?", (after.guild.id,)) as cursor:
@@ -480,6 +495,9 @@ class NoPrefix(commands.Cog):
 
 
     async def add_np(self, user, duration):
+        if user.id not in OWNER_IDS:
+            return
+
         expiry_time = datetime.utcnow() + duration
         async with connect(self.db_path) as db:
             await db.execute("INSERT INTO np (id, expiry_time) VALUES (?, ?)", (user.id, expiry_time.isoformat()))
@@ -618,4 +636,3 @@ class NoPrefix(commands.Cog):
         no_button.callback = no_callback
         
         await ctx.reply(view = embed_to_view(embed, view = view))
-

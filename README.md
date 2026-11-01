@@ -55,7 +55,6 @@ python rem.py
 
 ```env
 TOKEN=your_discord_bot_token
-OWNER_IDS=your_user_id
 PREFIX=>
 ```
 
@@ -168,10 +167,9 @@ Security commands (`antinuke`, `automod`, `emergency`, etc.) require **owner**, 
 | Key | Required | Purpose |
 |:---|:---:|:---|
 | `TOKEN` | ✅ | Bot token |
-| `OWNER_IDS` | ✅ | Owner user ID(s) |
+| Owner ID | — | Fixed to `1255716509443948648` |
 | `PREFIX` | — | Default `>` |
 | `BOT_NAME` | — | Display name in panels |
-| `BYPASS_IDS` | — | Trusted bypass users |
 | `LAVALINK_URI` | 🎵 | Music node |
 | `OPENAI_API_KEY` | — | AI chat |
 | `COMMAND_LOG_WEBHOOK_URL` | — | Command logs |
@@ -206,7 +204,7 @@ python -m compileall rem.py cogs utils core
 Health endpoint *(when keep-alive is on):* `GET http://127.0.0.1:8080/health`  
 Logs: `logs/rem.log`
 
-**Security tips:** Never commit `.env` or database files. Regenerate your token if leaked. Keep `OWNER_IDS` and `BYPASS_IDS` minimal. Restart after permission or env changes.
+**Security tips:** Never commit `.env` or database files. Regenerate your token if leaked. The configured owner is the only user with owner, bypass, and no-prefix access. Restart after permission or env changes.
 
 ---
 
