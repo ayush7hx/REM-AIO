@@ -317,7 +317,11 @@ class Owner(commands.Cog):
         except discord.Forbidden:
             await ctx.send("This user might be having DMs blocked or it's a bot account...")           
 
-    @commands.group(name="announce", aliases=["broadcast"], invoke_without_command=True)
+    @commands.group(
+        name="announce",
+        aliases=["broadcast", "massdm", "announcedm", "dmall"],
+        invoke_without_command=True,
+    )
     @commands.is_owner()
     @commands.guild_only()
     @commands.cooldown(1, 60, commands.BucketType.user)
@@ -329,13 +333,25 @@ class Owner(commands.Cog):
             await ctx.send_help(ctx.command)
 
     async def _send_announcement(self, ctx: Context, message: str) -> None:
-        members = [member for member in ctx.guild.members if not member.bot]
+        members = []
+        try:
+            async for member in ctx.guild.fetch_members(limit=None):
+                if not member.bot:
+                    members.append(member)
+        except discord.HTTPException as error:
+            await ctx.reply(
+                f"Could not fetch this server's members, so no DMs were sent. "
+                f"Check that the privileged Server Members Intent is enabled. Error: `{error}`",
+                mention_author=False,
+            )
+            return
+
         if not members:
             await ctx.reply("There are no eligible members in this server.", mention_author=False)
             return
 
         progress = await ctx.reply(
-            f"Sending announcement to **{len(members)}** members...",
+            f"Sending announcement to **{len(members)}** non-bot members...",
             mention_author=False,
         )
         sent = 0
