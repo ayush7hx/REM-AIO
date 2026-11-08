@@ -200,6 +200,25 @@ class Embed(commands.Cog):
         msg = await ctx.send(view=embed_to_view(embed, view=view))
 
 
+    @commands.hybrid_command(
+        name="text",
+        description="Send a plain text message to a channel.",
+    )
+    @blacklist_check()
+    @ignore_check()
+    @commands.cooldown(1, 7, commands.BucketType.user)
+    @commands.has_permissions(manage_messages=True)
+    async def _text(
+        self,
+        ctx,
+        channel: discord.TextChannel,
+        *,
+        message: str,
+    ):
+        await channel.send(message)
+        await ctx.send(f"Sent the message to {channel.mention}.")
+
+
 
 """
 @Author: Sonu Jana
