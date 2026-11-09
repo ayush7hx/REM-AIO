@@ -1,7 +1,7 @@
 from utils.database import connect
 from utils import emojis
-
 import logging
+from core.Context import pause_for_cloudflare_rate_limit
 
 import discord
 from discord.ext import commands
@@ -124,7 +124,12 @@ class Warn(commands.Cog):
                 dm_status = "Yes"
             except discord.Forbidden:
                 dm_status = "No"
-            except discord.HTTPException:
+            except discord.HTTPException as error:
+                if pause_for_cloudflare_rate_limit(self.bot, error):
+                    log.warning(
+                        "Could not DM the warned member because of Discord Cloudflare rate limiting."
+                    )
+                    return
                 dm_status = "No"
 
             
@@ -143,6 +148,10 @@ class Warn(commands.Cog):
             message = await ctx.send(view = embed_to_view(embed, view = view))
             view.message = message
         except Exception as e:
+            if isinstance(e, discord.HTTPException) and e.status == 429:
+                pause_for_cloudflare_rate_limit(self.bot, e)
+                log.exception("Discord rate limit prevented the warn response")
+                return
             await ctx.send(f"An error occurred: {str(e)}")
             log.exception("Error during warn command")
 
@@ -168,6 +177,10 @@ class Warn(commands.Cog):
 
             await ctx.send(view = embed_to_view(embed))
         except Exception as e:
+            if isinstance(e, discord.HTTPException) and e.status == 429:
+                pause_for_cloudflare_rate_limit(self.bot, e)
+                log.exception("Discord rate limit prevented the clearwarns response")
+                return
             await ctx.send(f"An error occurred: {str(e)}")
             log.exception("Error during clearwarns command")
 
