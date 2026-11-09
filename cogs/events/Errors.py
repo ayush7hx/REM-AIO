@@ -5,10 +5,23 @@ from discord.ext import commands
 from discord import app_commands
 from utils.config import serverLink
 from core import Rem, Cog, Context
+from core.Context import (
+  CloudflareRateLimitActive,
+  pause_for_cloudflare_rate_limit,
+)
 from utils.Tools import SecurityAccessDenied, get_ignore_data
 from utils.cv2_compat import embed_to_view, embeds_to_view
 
 log = logging.getLogger(__name__)
+
+
+def _original_error(error):
+  original = getattr(error, "original", None)
+  while original is not None and original is not error:
+    error = original
+    original = getattr(error, "original", None)
+  return error
+
 
 class Errors(Cog):
   def __init__(self, client: Rem):
@@ -17,6 +30,17 @@ class Errors(Cog):
   @commands.Cog.listener()
   async def on_command_error(self, ctx: Context, error):
     if ctx.command is None:
+      return
+
+    original_error = _original_error(error)
+    if isinstance(original_error, CloudflareRateLimitActive):
+      return
+    if isinstance(original_error, discord.HTTPException) and original_error.status == 429:
+      pause_for_cloudflare_rate_limit(self.client, original_error)
+      log.warning(
+        "Command %s hit HTTP 429; skipping the error response.",
+        ctx.command.qualified_name,
+      )
       return
 
     async def send_command_error():
@@ -145,18 +169,29 @@ class Errors(Cog):
       log.exception("Command %s failed", ctx.command.qualified_name if ctx.command else "unknown", exc_info=error.original)
       try:
         await send_command_error()
-      except discord.HTTPException:
+      except (discord.HTTPException, CloudflareRateLimitActive):
         pass
       return
 
     log.exception("Unhandled command error in %s", ctx.command.qualified_name if ctx.command else "unknown", exc_info=error)
     try:
       await send_command_error()
-    except discord.HTTPException:
+    except (discord.HTTPException, CloudflareRateLimitActive):
       pass
 
   @commands.Cog.listener()
   async def on_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+    original_error = _original_error(error)
+    if isinstance(original_error, CloudflareRateLimitActive):
+      return
+    if isinstance(original_error, discord.HTTPException) and original_error.status == 429:
+      pause_for_cloudflare_rate_limit(self.client, original_error)
+      log.warning(
+        "App command %s hit HTTP 429; skipping the error response.",
+        getattr(interaction.command, "qualified_name", "unknown"),
+      )
+      return
+
     if isinstance(error, app_commands.CommandOnCooldown):
       message = f"Slow down. Try again in **{error.retry_after:.2f}** seconds."
     elif isinstance(error, app_commands.MissingPermissions):
@@ -185,5 +220,5 @@ class Errors(Cog):
         await interaction.followup.send(message, ephemeral=True)
       else:
         await interaction.response.send_message(message, ephemeral=True)
-    except discord.HTTPException:
+    except (discord.HTTPException, CloudflareRateLimitActive):
       pass
